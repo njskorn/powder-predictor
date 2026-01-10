@@ -1,0 +1,45 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# Data files
+data/*.duckdb
+data/*.parquet
+*.csv
+*.db
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Environment variables
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# Airflow
+logs/
+airflow.db
+airflow.cfg
+
+# Secrets
+*.pem
+*.key
+secrets/

@@ -68,31 +68,44 @@ def scrape_mountain_report():
     
     # Extract surface conditions
     try:
-        # Look for "PRIMARY SURFACE" and "SECONDARY SURFACE"
-        primary = soup.find(string=lambda text: text and 'PRIMARY SURFACE' in text.upper())
-        if primary:
-            parent = primary.find_parent()
+        # Look for "PRIMARY SURFACE" and "SECONDARY SURFACE" headings
+        # The actual value should be in a nearby element
+        primary_label = soup.find(string=lambda text: text and 'PRIMARY SURFACE' == text.strip())
+        if primary_label:
+            # Find the parent container and look for the value
+            parent = primary_label.find_parent()
             if parent:
-                # Get the next text element
-                conditions_elem = parent.find_next(string=True)
-                if conditions_elem:
-                    data['primary_surface'] = conditions_elem.strip()
+                # The value might be in a sibling or nearby div
+                # Try to find next sibling or nearby text
+                next_elem = parent.find_next_sibling()
+                if next_elem:
+                    value = next_elem.get_text(strip=True)
+                    if value and value != 'PRIMARY SURFACE':
+                        data['primary_surface'] = value
+                        print(f"Extracted primary surface: {value}")
         
-        secondary = soup.find(string=lambda text: text and 'SECONDARY SURFACE' in text.upper())
-        if secondary:
-            parent = secondary.find_parent()
+        secondary_label = soup.find(string=lambda text: text and 'SECONDARY SURFACE' == text.strip())
+        if secondary_label:
+            parent = secondary_label.find_parent()
             if parent:
-                conditions_elem = parent.find_next(string=True)
-                if conditions_elem:
-                    data['secondary_surface'] = conditions_elem.strip()
+                next_elem = parent.find_next_sibling()
+                if next_elem:
+                    value = next_elem.get_text(strip=True)
+                    if value and value != 'SECONDARY SURFACE':
+                        data['secondary_surface'] = value
+                        print(f"Extracted secondary surface: {value}")
     except Exception as e:
         print(f"Warning: Could not extract surface conditions: {e}")
     
     # Extract last updated timestamp
     try:
-        updated = soup.find(string=lambda text: text and 'Last Updated:' in text)
-        if updated:
-            data['last_updated'] = updated.strip()
+        # Find text containing "Last Updated:"
+        updated_elem = soup.find(string=lambda text: text and 'Last Updated:' in text)
+        if updated_elem:
+            # Get the full text which should include the timestamp
+            full_text = updated_elem.strip()
+            data['last_updated'] = full_text
+            print(f"Extracted last updated: {full_text}")
     except Exception as e:
         print(f"Warning: Could not extract last updated: {e}")
     
@@ -244,36 +257,41 @@ def scrape_trails_lifts():
             table = lifts_heading.find_next('table')
             
             if table:
-                # Find all rows in this table
-                lift_rows = table.find_all('tr', class_=lambda x: x and 'flex items-center' in x)
+                # Find tbody (the actual data rows)
+                tbody = table.find('tbody')
+                if not tbody:
+                    tbody = table  # Sometimes tbody is optional
+                
+                # Find all rows
+                lift_rows = tbody.find_all('tr', class_=lambda x: x and 'flex items-center' in x)
                 
                 for row in lift_rows:
                     lift_info = {}
                     
-                    # Status from first SVG with aria-label
-                    status_svg = row.find('svg', {'aria-label': True})
-                    if status_svg:
-                        aria_label = status_svg.get('aria-label', '')
-                        if 'checkmark' in aria_label.lower():
-                            lift_info['status'] = 'open'
-                        elif 'x' in aria_label.lower():
-                            lift_info['status'] = 'closed'
-                        elif 'hold' in aria_label.lower():
-                            lift_info['status'] = 'on_hold'
+                    # Status from first td's SVG with aria-label
+                    first_td = row.find('td', class_='font-medium')
+                    if first_td:
+                        status_svg = first_td.find('svg', {'aria-label': True})
+                        if status_svg:
+                            aria_label = status_svg.get('aria-label', '').lower()
+                            if 'checkmark' in aria_label:
+                                lift_info['status'] = 'open'
+                            elif 'x' in aria_label:
+                                lift_info['status'] = 'closed'
+                            elif 'triangle' in aria_label or 'hold' in aria_label:
+                                lift_info['status'] = 'on_hold'
                     
-                    # Lift name from any td with text
-                    name_td = row.find('td', class_=lambda x: x and 'whitespace-nowrap' in x and 'font' in str(x))
-                    if not name_td:
-                        # Try finding any td with substantive text
-                        for td in row.find_all('td'):
-                            text = td.get_text(strip=True)
-                            # Skip tds that only have times or are empty
-                            if text and len(text) > 3 and not re.match(r'^\d+:\d+', text):
-                                name_td = td
-                                break
+                    # Lift name from div with font-swiss-heavy class
+                    name_div = row.find('div', class_=lambda x: x and 'font-swiss-heavy' in x)
+                    if name_div:
+                        lift_info['name'] = name_div.get_text(strip=True)
                     
-                    if name_td:
-                        lift_info['name'] = name_td.get_text(strip=True)
+                    # Operating hours (optional - if present)
+                    hours_div = row.find('div', class_='flex flex-col')
+                    if hours_div:
+                        hours_text = hours_div.get_text(strip=True)
+                        if hours_text and len(hours_text) > 3:
+                            lift_info['hours'] = hours_text
                     
                     # Only add if we got a name
                     if lift_info.get('name'):

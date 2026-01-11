@@ -52,85 +52,88 @@ def scrape_bretton_woods():
         'scraped_at': datetime.now().isoformat(),
         'source_url': url,
     }
-    
+    # Find ONLY the Alpine Report tab
+    alpine_tab = soup.find('li', id='alpine-report-2')
     # Extract top of the page Snow Report metrics
     try:
-        # Extract summary items (Trail Count, Glades Count, Lifts Open, etc.)
-        summary_items = soup.find_all('div', class_='trail-reports__summary-item')
-        
-        for item in summary_items:
-            heading = item.find('div', class_='trail-reports__summary-item-heading')
-            count = item.find('div', class_='trail-reports__summary-item-count')
+        # Alpine tab only, not nordic tab
+        if alpine_tab:
+            # Extract summary items (Trail Count, Glades Count, Lifts Open, etc.)
+            summary_items = alpine_tab.find_all('div', class_='trail-reports__summary-item')
             
-            if heading and count:
-                heading_text = heading.get_text(strip=True)
-                count_text = count.get_text(strip=True)
+            for item in summary_items:
+                heading = item.find('div', class_='trail-reports__summary-item-heading')
+                count = item.find('div', class_='trail-reports__summary-item-count')
                 
-                # Map heading to field name
-                if 'Trail Count' in heading_text:
-                    data['open_trails'] = count_text
-                elif 'Glades Count' in heading_text:
-                    data['glades_open'] = count_text
-                elif 'Lifts Open' in heading_text:
-                    data['open_lifts'] = count_text
-                elif 'Total Acreage' in heading_text:
-                    data['total_acreage'] = count_text
-                elif 'Total Miles' in heading_text:
-                    data['total_miles'] = count_text
-        
-        # Extract 'info' items (Trail Acreage, Glade Acreage, Lift Hours, Grooming, etc.)
-        info_items = soup.find_all('div', class_='trail-reports__info-item')
-        
-        for item in info_items:
-            heading = item.find('div', class_='trail-reports__info-item-heading')
-            value = item.find('div', class_='trail-reports__info-item-value')
+                if heading and count:
+                    heading_text = heading.get_text(strip=True)
+                    count_text = count.get_text(strip=True)
+                    
+                    # Map heading to field name
+                    if 'Trail Count' in heading_text:
+                        data['open_trails'] = count_text
+                    elif 'Glades Count' in heading_text:
+                        data['glades_open'] = count_text
+                    elif 'Lifts Open' in heading_text:
+                        data['open_lifts'] = count_text
+                    elif 'Total Acreage' in heading_text:
+                        data['total_acreage'] = count_text
+                    elif 'Total Miles' in heading_text:
+                        data['total_miles'] = count_text
             
-            if heading and value:
-                heading_text = heading.get_text(strip=True).replace(':', '').strip()
-                value_text = value.get_text(strip=True)
-                
-                # Map heading to field name
-                if 'Trail Acreage' in heading_text:
-                    data['trail_acreage'] = value_text
-                elif 'Glade Acreage' in heading_text:
-                    data['glade_acreage'] = value_text
-                elif 'Lift Hours' in heading_text:
-                    data['lift_hours'] = value_text
-                elif 'Grooming' in heading_text:
-                    data['grooming'] = value_text
-                elif 'Snowmaking' in heading_text:
-                    data['snowmaking'] = value_text
-                elif 'Snow Conditions' in heading_text:
-                    data['snow_conditions'] = value_text
-                elif 'Base Depth' in heading_text:
-                    data['base_depth'] = value_text
-        
-        # Extract snowfall data from the table
-        snowfall_rows = soup.find_all('div', class_='trail-reports__snowfall-row')
-        
-        for row in snowfall_rows:
-            cells = row.find_all('div', class_='trail-reports__snowfall-cell')
+            # Extract 'info' items (Trail Acreage, Glade Acreage, Lift Hours, Grooming, etc.)
+            info_items = alpine_tab.find_all('div', class_='trail-reports__info-item')
             
-            if len(cells) >= 3:  # Label + 2 values (base and upper)
-                label = cells[0].get_text(strip=True)
-                value1 = cells[1].get_text(strip=True) if len(cells) > 1 else ''
-                value2 = cells[2].get_text(strip=True) if len(cells) > 2 else ''
+            for item in info_items:
+                heading = item.find('div', class_='trail-reports__info-item-heading')
+                value = item.find('div', class_='trail-reports__info-item-value')
                 
-                if 'Recent' in label:
-                    data['recent_snowfall_base'] = value1
-                    data['recent_snowfall_upper'] = value2
-                elif 'Season to Date' in label or 'Season' in label:
-                    data['season_snowfall_base'] = value1
-                    data['season_snowfall_upper'] = value2
-        
-        print(f"Extracted structured metrics: {len([k for k in data.keys() if k not in ['mountain', 'scraped_at', 'source_url']])} fields")
+                if heading and value:
+                    heading_text = heading.get_text(strip=True).replace(':', '').strip()
+                    value_text = value.get_text(strip=True)
+                    
+                    # Map heading to field name
+                    if 'Trail Acreage' in heading_text:
+                        data['trail_acreage'] = value_text
+                    elif 'Glade Acreage' in heading_text:
+                        data['glade_acreage'] = value_text
+                    elif 'Lift Hours' in heading_text:
+                        data['lift_hours'] = value_text
+                    elif 'Grooming' in heading_text:
+                        data['grooming'] = value_text
+                    elif 'Snowmaking' in heading_text:
+                        data['snowmaking'] = value_text
+                    elif 'Snow Conditions' in heading_text:
+                        data['snow_conditions'] = value_text
+                    elif 'Base Depth' in heading_text:
+                        data['base_depth'] = value_text
+            
+            # Extract snowfall data from the table
+            snowfall_rows = alpine_tab.find_all('div', class_='trail-reports__snowfall-row')
+            
+            for row in snowfall_rows:
+                cells = row.find_all('div', class_='trail-reports__snowfall-cell')
+                
+                if len(cells) >= 3:  # Label + 2 values (base and upper)
+                    label = cells[0].get_text(strip=True)
+                    value1 = cells[1].get_text(strip=True) if len(cells) > 1 else ''
+                    value2 = cells[2].get_text(strip=True) if len(cells) > 2 else ''
+                    
+                    if 'Recent' in label:
+                        data['recent_snowfall_base'] = value1
+                        data['recent_snowfall_upper'] = value2
+                    elif 'Season to Date' in label or 'Season' in label:
+                        data['season_snowfall_base'] = value1
+                        data['season_snowfall_upper'] = value2
+            
+            print(f"Extracted structured metrics: {len([k for k in data.keys() if k not in ['mountain', 'scraped_at', 'source_url']])} fields")
     except Exception as e:
         print(f"Warning: Could not extract all metrics: {e}")
         data['metrics_extraction_error'] = str(e)
     
     # Extract last updated timestamp
     try:
-        updated_elem = soup.find(string=lambda text: text and 'Updated:' in text)
+        updated_elem = alpine_tab.find(string=lambda text: text and 'Updated:' in text)
         if updated_elem:
             data['last_updated'] = updated_elem.strip()
     except Exception as e:
@@ -139,7 +142,7 @@ def scrape_bretton_woods():
     # Extract narrative/comments
     try:
         # Look for "Comments" section
-        comments_header = soup.find(string=lambda text: text and 'Comments' in text)
+        comments_header = alpine_tab.find(string=lambda text: text and 'Comments' in text)
         if comments_header:
             # Get the parent and following siblings/content
             parent = comments_header.find_parent()

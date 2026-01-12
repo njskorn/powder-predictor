@@ -116,12 +116,15 @@ def scrape_bretton_woods():
                 
                 if len(cells) >= 3:  # Label + 2 values (base and upper)
                     label = cells[0].get_text(strip=True)
-                    value1 = cells[1].get_text(strip=True) if len(cells) > 1 else ''
-                    value2 = cells[2].get_text(strip=True) if len(cells) > 2 else ''
+                    
+                    # Get text and handle empty strings by defaulting to "0"
+                    value1 = cells[1].get_text(strip=True) or '0"'  # Empty cell = 0"
+                    value2 = cells[2].get_text(strip=True) or '0"'  # Empty cell = 0"
                     
                     if 'Recent' in label:
-                        data['recent_snowfall_base'] = value1
-                        data['recent_snowfall_upper'] = value2
+                        data['recent_snowfall_base'] = value1   # Default to 0" if empty
+                        data['recent_snowfall_upper'] = value2 
+                        print(f"Extracted recent snowfall - Base: {data['recent_snowfall_base']}, Upper: {data['recent_snowfall_upper']}")
                     elif 'Season to Date' in label or 'Season' in label:
                         data['season_snowfall_base'] = value1
                         data['season_snowfall_upper'] = value2

@@ -66,7 +66,7 @@ def fetch_latest_bronze_reports():
 
 def extract_numeric(text):
     """Extract numeric value from strings like '79"' or '4 inches'"""
-    if not text:
+    if text is None or text == '':
         return None
     match = re.search(r'([\d.]+)', str(text))
     return float(match.group(1)) if match else None

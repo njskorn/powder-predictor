@@ -269,10 +269,10 @@ def transform_to_silver(**context):
     
     # Create bucket if it doesn't exist
     try:
-        s3.head_bucket(Bucket='silver-snow-conditions')
+        s3.head_bucket(Bucket='silver-snow-reports')
     except:
-        s3.create_bucket(Bucket='silver-snow-conditions')
-        print("Created silver-snow-conditions bucket")
+        s3.create_bucket(Bucket='silver-snow-reports')
+        print("Created silver-snow-reports bucket")
     
     # Upload JSON file
     date_str = datetime.now().strftime('%Y-%m-%d')
@@ -280,14 +280,14 @@ def transform_to_silver(**context):
     
     with open(output_path, 'rb') as f:
         s3.put_object(
-            Bucket='silver-snow-conditions',
+            Bucket='silver-snow-reports',
             Key=s3_key,
             Body=f,
             ContentType='application/json',
             Metadata={'date': date_str}
         )
     
-    print(f"Uploaded to Silver: s3://silver-snow-conditions/{s3_key}")
+    print(f"Uploaded to Silver: s3://silver-snow-reports/{s3_key}")
     
     return s3_key
 

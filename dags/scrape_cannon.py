@@ -65,6 +65,22 @@ def scrape_mountain_report():
                     print(f"Extracted season snowfall: {data['season_snowfall']}")
     except Exception as e:
         print(f"Warning: Could not extract season snowfall: {e}")
+
+    # Extract recent snowfall (displayed when available)
+    try:
+        # Look for "NEW SNOWFALL" label
+        new_snow_label = soup.find('span', string=lambda text: text and 'NEW SNOWFALL' in text.upper())
+        if new_snow_label:
+            # The snowfall amount is in a sibling span with large font
+            parent = new_snow_label.find_parent()
+            if parent:
+                # Find the span with the number (font-swiss-heavy text-8xl)
+                snow_amount = parent.find('span', class_=lambda x: x and 'font-swiss-heavy' in x and 'text-8xl' in x)
+                if snow_amount:
+                    data['recent_snowfall'] = snow_amount.get_text(strip=True)
+                    print(f"Extracted recent snowfall: {data['recent_snowfall']}")
+    except Exception as e:
+        print(f"WARNING: Could not extract recent snowfall: {e}")
     
     # Extract surface conditions
     try:
@@ -99,15 +115,17 @@ def scrape_mountain_report():
     
     # Extract last updated timestamp
     try:
-        # Find text containing "Last Updated:"
-        updated_elem = soup.find(string=lambda text: text and 'Last Updated:' in text)
+        # Find any div containing "Last Updated:" text
+        # The class might vary, so search by text content
+        updated_elem = soup.find('div', string=lambda text: text and 'Last Updated:' in text)
         if updated_elem:
-            # Get the full text which should include the timestamp
-            full_text = updated_elem.strip()
+            full_text = updated_elem.get_text(strip=True)
             data['last_updated'] = full_text
             print(f"Extracted last updated: {full_text}")
+        else:
+            print("WARNING: Could not find last updated timestamp")
     except Exception as e:
-        print(f"Warning: Could not extract last updated: {e}")
+        print(f"WARNING: Could not extract last updated: {e}")
     
     # Extract narrative report (the main text block)
     try:
@@ -134,6 +152,10 @@ def scrape_mountain_report():
         print(f"Warning: Could not extract narrative text: {e}")
     
     print(f"Mountain report scraped: {len(data)} fields")
+
+    # TEMP DEBUG: At end of scrape_mountain_report() before return
+    print(f"DEBUG: mountain_report data keys: {data.keys()}")
+    print(f"DEBUG: last_updated value: {data.get('last_updated', 'NOT FOUND')}")
     return data
 
 def scrape_trails_lifts():
@@ -319,6 +341,20 @@ def combine_and_save(**context):
     
     if not mountain_data or not trails_data:
         raise ValueError("Missing data from one or both scraping tasks")
+    
+    # Count total trails and lifts from the detailed lists
+    total_trails = len(trails_data.get('trails', []))
+    open_trails = len([t for t in trails_data.get('trails', []) if t.get('status') == 'open'])
+    
+    total_lifts = len(trails_data.get('lifts', []))
+    open_lifts = len([l for l in trails_data.get('lifts', []) if l.get('status') == 'open'])
+    
+    # Override the summary counts with calculated totals in "X/Y" format
+    trails_data['trails_open'] = f"{open_trails}/{total_trails}"
+    trails_data['lifts_open'] = f"{open_lifts}/{total_lifts}"
+    
+    print(f"Calculated trail counts: {open_trails}/{total_trails}")
+    print(f"Calculated lift counts: {open_lifts}/{total_lifts}")
     
     # Combine into single record
     combined = {

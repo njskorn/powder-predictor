@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
+from pathlib import Path
 
 app = FastAPI(title="Powder Predictor API")
 
@@ -14,11 +15,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.get("/")
-def root():
-    """Serve the dashboard"""
-    return FileResponse("../web/index.html")
 
 @app.get("/api/health")
 def health():
@@ -34,4 +30,6 @@ def get_conditions():
     }
 
 # Mount static files (CSS, JS)
-app.mount("/static", StaticFiles(directory="web"), name="static")
+BASE_DIR = Path(__file__).parent.parent
+WEB_DIR = BASE_DIR / "web"
+app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")

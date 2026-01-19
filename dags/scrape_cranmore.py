@@ -105,10 +105,16 @@ def scrape_cranmore():
             report_text = []
             
             # Get all text after "Report:"
-            for sibling in parent.find_next_siblings():
-                text = sibling.get_text(strip=True)
-                if text and text != 'Report:':
-                    report_text.append(text)
+            for sibling in report_elem.find_next_siblings():
+                # Stop when we hit the structured data tables
+                if sibling.name == 'div':
+                    break
+                
+                # Only process paragraph tags
+                if sibling.name == 'p':
+                    text = sibling.get_text(strip=True)
+                    if text and text != 'Report:':
+                        report_text.append(text)
             
             data['report_text'] = ' '.join(report_text)
         

@@ -1,8 +1,15 @@
 """
-Cannon Mountain Snow Report Scraper - VERSION 2.0
-==================================================
+Cannon Mountain Snow Report Scraper - VERSION 3.0
+=================================================
 
-Built from actual HTML structure analysis on 2026-01-22
+FIXED in v3.0:
+    - Proper HTML structure navigation (no more regex on text)
+    - Area detection using <div class="mb-7"> and <h3> tags
+    - Difficulty extraction from SVG aria-labels
+    - No more lift/trail contamination
+    - No more "Variable conditions" as trail names
+    - Proper temperature extraction (BASE low/high)
+    - Trail-specific table parsing (not all <tr> on page)
 
 Cannon Mountain Specific Features:
     - TWO PAGES to scrape (mountain-report + trails-lifts)
@@ -67,7 +74,7 @@ def create_minio_client():
 
 def scrape_cannon():
     """
-    Comprehensive scrape of Cannon Mountain (v2.0)
+    Comprehensive scrape of Cannon Mountain (v3.0 - MAJOR FIX)
     
     Scrapes TWO pages:
     1. Mountain Report - summary metrics, weather, narrative
@@ -89,7 +96,7 @@ def scrape_cannon():
     trails_lifts_url = 'https://www.cannonmt.com/trails-lifts'
     
     headers = {
-        'User-Agent': 'PowderPredictor/2.0 (Educational Project; nettle@example.com)'
+        'User-Agent': 'PowderPredictor/3.0 (Educational Project; [email protected])'
     }
 
     print(f"Fetching Cannon Mountain data from 2 pages...")
@@ -103,7 +110,7 @@ def scrape_cannon():
                 'mountain_report': mountain_report_url,
                 'trails_lifts': trails_lifts_url
             },
-            'scraper_version': '2.0'
+            'scraper_version': '3.0'
         },
         'summary_metrics': {
             'mountain_report_page': {},  # Numbers from page 1
@@ -115,9 +122,7 @@ def scrape_cannon():
         },
         'lifts': [],
         'trails': [],
-        'glades': [],
-        'terrain_parks': [],
-        'narrative_report': ''
+        'glades': []
     }
 
     # ========================================================================
@@ -142,6 +147,7 @@ def scrape_cannon():
         if snowfall_match:
             data['summary_metrics']['mountain_report_page']['snowfall_to_date'] = f'{snowfall_match.group(1)}"'
         
+        # Open trails
         trails_match = re.search(r'(\d+)\s*OPEN TRAILS', page1_text)
         if trails_match:
             data['summary_metrics']['mountain_report_page']['open_trails'] = trails_match.group(1)
@@ -150,21 +156,19 @@ def scrape_cannon():
         if lifts_match:
             data['summary_metrics']['mountain_report_page']['open_lifts'] = lifts_match.group(1)
         
-        new_snow_match = re.search(r'(\d+)"\s*NEW SNOWFALL', page1_text)
+        # New snowfall
+        new_snow_match = re.search(r'(\d+)"?\s*NEW SNOW', page1_text)
         if new_snow_match:
-            data['summary_metrics']['mountain_report_page']['snowfall_new'] = f'{new_snow_match.group(1)}"'
+            data['summary_metrics']['mountain_report_page']['snowfall_new'] = new_snow_match.group(1) + '"'
         
-        primary_match = re.search(r'PRIMARY SURFACE\s*([^\n]+)', page1_text)
-        if primary_match:
-            data['summary_metrics']['mountain_report_page']['primary_surface'] = primary_match.group(1).strip()
-        
-        secondary_match = re.search(r'SECONDARY SURFACE\s*([^\n]+)', page1_text)
-        if secondary_match:
-            data['summary_metrics']['mountain_report_page']['secondary_surface'] = secondary_match.group(1).strip()
+        # Snowfall to date
+        snowfall_match = re.search(r'(\d+)"?\s*(?:SNOW\s+)?TO DATE', page1_text)
+        if snowfall_match:
+            data['summary_metrics']['mountain_report_page']['snowfall_to_date'] = snowfall_match.group(1) + '"'
         
         print(f"   ✓ Extracted {len(data['summary_metrics']['mountain_report_page'])} metrics")
         
-        # Extract Weather - BASE vs SUMMIT
+        # Extract Weather - BASE vs SUMMIT (v2.1 patterns)
         print("\n[2/4] Extracting BASE and SUMMIT weather...")
         
         temp_low_match = re.search(r'LOW\s*(\d+)º', page1_text)
@@ -175,76 +179,77 @@ def scrape_cannon():
         if temp_high_match:
             data['weather']['base']['temperature_high'] = f"{temp_high_match.group(1)}°F"
         
-        wind_base_match = re.search(r'BASE\s*([NESW/]+),\s*([\d-]+\s*mph)', page1_text)
+        # Wind - BASE and SUMMIT
+        wind_base_match = re.search(r'WIND\s*BASE\s*([NESW/]+),\s*([\d\-]+\s*mph)', page1_text)
         if wind_base_match:
             data['weather']['base']['wind_direction'] = wind_base_match.group(1)
             data['weather']['base']['wind_speed'] = wind_base_match.group(2)
         
-        wind_summit_match = re.search(r'SUMMIT\s*([NESW/]+),\s*([\d-]+\s*mph)', page1_text)
+        wind_summit_match = re.search(r'SUMMIT\s*([NESW/]+),\s*([\d\-]+\s*mph)', page1_text)
         if wind_summit_match:
             data['weather']['summit']['wind_direction'] = wind_summit_match.group(1)
             data['weather']['summit']['wind_speed'] = wind_summit_match.group(2)
         
-        conditions_match = re.search(r'(Increasing Clouds|Light Snow|Heavy Snow|Clear|Partly Cloudy|Cloudy|Snow Showers)', page1_text)
+        # Overall conditions
+        conditions_match = re.search(r'(Increasing Clouds|Light Snow|Heavy Snow|Clear|Partly Cloudy|Cloudy|Snow Showers|Mostly Cloudy)', page1_text)
         if conditions_match:
             data['weather']['conditions'] = conditions_match.group(1)
         
         print(f"   ✓ BASE: {len(data['weather']['base'])} fields, SUMMIT: {len(data['weather']['summit'])} fields")
-        if data['weather']['summit'].get('wind_speed'):
-            print(f"   ℹ SUMMIT WIND: {data['weather']['summit']['wind_speed']}")
         
-        # Extract Narrative
-        print("\n[3/4] Extracting narrative...")
-        
-        quote_elem = soup1.find(string=re.compile(r'"In skiing|Good afternoon|Good morning'))
-        if quote_elem:
-            parent = quote_elem.find_parent()
-            narrative_parts = [quote_elem.strip()]
-            
-            for sibling in parent.find_next_siblings():
-                text = sibling.get_text(strip=True)
-                if text and len(text) > 50:
-                    narrative_parts.append(text)
-                    if len(narrative_parts) >= 10:
-                        break
-            
-            data['narrative_report'] = '\n\n'.join(narrative_parts)
-        
-        updated_match = re.search(r'Last Updated:\s*([^\n]+)', page1_text)
-        if updated_match:
-            data['metadata']['last_updated'] = updated_match.group(1).strip()
-        
-        print(f"   ✓ Narrative: {len(data['narrative_report'])} chars")
-        
-        # Extract Lifts
-        print("\n[4/4] Extracting lifts...")
-        
+        # Extract Lifts from page 1 - v2.1 approach (was working)
+        print("\n[3/4] Extracting lifts from Mountain Report...")
+
+        # Look for lifts table (v2.1 method that worked)
         lifts_section = soup1.find(string=re.compile(r'Lifts'))
         if lifts_section:
-            table = lifts_section.find_next('table')
+            table = lifts_section.find_parent().find_next('table')
             if table:
                 rows = table.find_all('tr')
+                
                 for row in rows:
-                    cells = row.find_all('td')
-                    if len(cells) >= 1:
-                        text = cells[0].get_text(strip=True)
-                        parts = text.split('  ')
-                        if len(parts) >= 1:
-                            name = parts[0].strip()
-                            hours = parts[1].strip() if len(parts) > 1 else None
-                            status = 'closed'
+                    try:
+                        # Get status from SVG circle fill color
+                        status = 'unknown'
+                        svg_circle = row.find('circle')
+                        if svg_circle:
+                            fill = svg_circle.get('fill', '').upper()
+                            if '27D94E' in fill:  # Green
+                                status = 'open'
+                            elif 'B52025' in fill:  # Red
+                                status = 'closed'
+                            elif 'FCDA00' in fill:  # Yellow
+                                status = 'on hold'
+                        
+                        # Find lift name in div with 'uppercase' class
+                        name_div = row.find('div', class_=lambda c: c and 'uppercase' in c if c else False)
+                        if name_div:
+                            name = name_div.get_text(strip=True)
                             
-                            if name and any(kw in name.lower() for kw in ['quad', 'triple', 'double', 'tram', 't-bar', 'tow', 'carpet']):
+                            # Find hours
+                            hours = None
+                            time_divs = row.find_all('div')
+                            for div in time_divs:
+                                text = div.get_text(strip=True)
+                                if ('a.m.' in text or 'p.m.' in text) and len(text) < 30:
+                                    hours = text
+                                    break
+                            
+                            if name:
                                 data['lifts'].append({
                                     'name': name,
                                     'status': status,
                                     'hours': hours
                                 })
-        
+                    except:
+                        continue
+
         print(f"   ✓ Extracted {len(data['lifts'])} lifts")
         
     except Exception as e:
-        print(f"   ✗ ERROR: {e}")
+        print(f"   ✗ ERROR on page 1: {e}")
+        import traceback
+        traceback.print_exc()
         data['summary_metrics']['mountain_report_page']['scraping_error'] = str(e)
 
     # ========================================================================
@@ -252,7 +257,7 @@ def scrape_cannon():
     # ========================================================================
     
     print("\n" + "="*60)
-    print("SCRAPING PAGE 2: Trails & Lifts")
+    print("SCRAPING PAGE 2: Trails & Lifts (FIXED HTML PARSING)")
     print("="*60)
     
     try:
@@ -262,8 +267,8 @@ def scrape_cannon():
         soup2 = BeautifulSoup(response2.content, 'html.parser')
         page2_text = soup2.get_text()
         
-        # Extract Summary
-        print("\n[5/8] Extracting summary from Trails & Lifts...")
+        # Extract Summary from page 2
+        print("\n[4/7] Extracting summary from Trails & Lifts...")
         
         trails_count = re.search(r'(\d+)\s*TRAILS', page2_text)
         if trails_count:
@@ -283,77 +288,200 @@ def scrape_cannon():
         
         print(f"   ✓ {len(data['summary_metrics']['trails_lifts_page'])} fields (may differ from page 1)")
         
-        # Extract Trails by Area
-        print("\n[6/8] Extracting trails by area...")
+        # Extract Trails by Area - v3.0 FIX: Proper HTML structure
+        print("\n[5/7] Extracting trails by area (v3.0 method)...")
         
-        area_headers = ['Upper Mountain', 'Tuckerbrook Family Area', 'Mid-Mountain', 'Front5', 'Mittersill']
-        current_area = None
+        # Find all area sections (div with mb-7 class containing h3 and table)
+        area_sections = soup2.find_all('div', class_='mb-7')
         
-        for elem in soup2.find_all(['h3', 'td']):
-            text = elem.get_text(strip=True)
-            
-            if text in area_headers:
-                current_area = text
-                print(f"   ℹ Area: {current_area}")
+        for section in area_sections:
+            # Get area name from h3
+            h3 = section.find('h3', class_='uppercase')
+            if not h3:
                 continue
             
-            if current_area and len(text) > 2 and text.isupper():
-                warning = None
-                if 'Use Caution' in text or 'Thin Cover' in text or 'Race Training' in text:
-                    parts = text.split('|')
-                    name = parts[0].strip() if len(parts) > 1 else text
-                    warning = parts[1].strip() if len(parts) > 1 else None
-                else:
-                    name = text
+            area_name = h3.get_text(strip=True)
+            
+            # Skip if this is the Glades section (handled separately)
+            if 'glade' in area_name.lower():
+                continue
+            
+            print(f"   ℹ Processing area: {area_name}")
+            
+            # Find table in this section
+            table = section.find('table')
+            if not table:
+                continue
+            
+            # Find all trail rows
+            rows = table.find_all('tr')
+            
+            for row in rows:
+                tds = row.find_all('td')
                 
-                if len(name) > 2 and not name.isdigit():
-                    data['trails'].append({
-                        'name': name,
-                        'status': 'unknown',
-                        'area': current_area,
-                        'warning': warning,
-                        'difficulty': None,
-                        'conditions': None,
-                        'night_skiing': False
-                    })
+                # Need at least 4 columns (status, grooming, difficulty, name)
+                if len(tds) < 4:
+                    continue
+                
+                # Column 0: Status (SVG circle color)
+                status = 'unknown'
+                status_svg = tds[0].find('circle')
+                if status_svg:
+                    fill = status_svg.get('fill', '').upper()
+                    if '27D94E' in fill:  # Green
+                        status = 'open'
+                    elif 'B52025' in fill:  # Red
+                        status = 'closed'
+                    elif 'FCDA00' in fill:  # Yellow
+                        status = 'on hold'
+                
+                # Column 1: Grooming (presence of groomer SVG)
+                groomed = False
+                groomer_svg = tds[1].find('svg', attrs={'aria-label': lambda x: x and 'groomer' in x.lower() if x else False})
+                if groomer_svg:
+                    groomed = True
+                
+                # Column 2: Difficulty (SVG aria-label)
+                difficulty = None
+                diff_svg = tds[2].find('svg')
+                if diff_svg:
+                    aria_label = diff_svg.get('aria-label', '').lower()
+                    if 'green' in aria_label:
+                        difficulty = 'green'
+                    elif 'blue' in aria_label:
+                        difficulty = 'blue'
+                    elif 'black' in aria_label or 'diamond' in aria_label:
+                        difficulty = 'black'
+                
+                # Column 3: Trail name
+                trail_name = tds[3].get_text(strip=True)
+                
+                # Skip empty names
+                if not trail_name or len(trail_name) < 2:
+                    continue
+                
+                # Column 4 (optional): Conditions/warnings
+                warning = None
+                if len(tds) > 4:
+                    cond_text = tds[4].get_text(strip=True)
+                    if cond_text and cond_text.lower() != 'variable conditions':
+                        warning = cond_text
+                
+                # Add trail
+                trail = {
+                    'name': trail_name,
+                    'status': status,
+                    'area': area_name,
+                    'warning': warning,
+                    'difficulty': difficulty,
+                    'conditions': 'groomed' if groomed else None,
+                    'night_skiing': False
+                }
+                
+                data['trails'].append(trail)
         
-        print(f"   ✓ {len(data['trails'])} trails")
+        print(f"   ✓ Extracted {len(data['trails'])} trails across all areas")
         
-        # Extract Glades
-        print("\n[7/8] Extracting glades...")
+        # Extract Glades - v3.0: Separate section
+        print("\n[6/7] Extracting glades...")
         
-        glades_header = soup2.find('h3', string='Glades')
+        # Find Glades section
+        glades_header = soup2.find('h3', string=re.compile(r'Glades', re.I))
         if glades_header:
-            for elem in glades_header.find_next_siblings(['td']):
-                text = elem.get_text(strip=True)
-                if text and len(text) > 2 and text.isupper():
-                    data['glades'].append({
-                        'name': text,
-                        'status': 'unknown',
-                        'area': 'Glades',
-                        'difficulty': None,
-                        'conditions': None
-                    })
+            glades_section = glades_header.find_parent('div', class_='mb-7')
+            if glades_section:
+                table = glades_section.find('table')
+                if table:
+                    rows = table.find_all('tr')
+                    
+                    for row in rows:
+                        tds = row.find_all('td')
+                        if len(tds) < 4:
+                            continue
+                        
+                        # Same column structure as trails
+                        status = 'unknown'
+                        status_svg = tds[0].find('circle')
+                        if status_svg:
+                            fill = status_svg.get('fill', '').upper()
+                            if '27D94E' in fill:
+                                status = 'open'
+                            elif 'B52025' in fill:
+                                status = 'closed'
+                        
+                        difficulty = None
+                        diff_svg = tds[2].find('svg')
+                        if diff_svg:
+                            aria_label = diff_svg.get('aria-label', '').lower()
+                            if 'green' in aria_label:
+                                difficulty = 'green'
+                            elif 'blue' in aria_label:
+                                difficulty = 'blue'
+                            elif 'black' in aria_label or 'diamond' in aria_label:
+                                difficulty = 'black'
+                        
+                        glade_name = tds[3].get_text(strip=True)
+                        
+                        # Get notes from column 4 (italic text)
+                        notes = None
+                        if len(tds) > 4:
+                            notes_text = tds[4].get_text(strip=True)
+                            if notes_text:
+                                notes = notes_text
+                        
+                        if glade_name and len(glade_name) > 2:
+                            data['glades'].append({
+                                'name': glade_name,
+                                'status': status,
+                                'area': 'Glades',
+                                'difficulty': difficulty,
+                                'conditions': notes
+                            })
         
-        print(f"   ✓ {len(data['glades'])} glades")
+        print(f"   ✓ Extracted {len(data['glades'])} glades")
+        
+        # Statistics
+        print("\n[7/7] Final statistics...")
+        
+        # Count by area
+        areas = {}
+        for trail in data['trails']:
+            area = trail.get('area', 'Unknown')
+            areas[area] = areas.get(area, 0) + 1
+        
+        print(f"   ℹ Areas: {', '.join(f'{area} ({count})' for area, count in sorted(areas.items()))}")
+        
+        # Count by difficulty
+        difficulties = {}
+        for trail in data['trails']:
+            diff = trail.get('difficulty') or 'None'
+            difficulties[diff] = difficulties.get(diff, 0) + 1
+        
+        print(f"   ℹ Difficulties: {', '.join(f'{diff} ({count})' for diff, count in sorted(difficulties.items()))}")
         
     except Exception as e:
-        print(f"   ✗ ERROR: {e}")
+        print(f"   ✗ ERROR on page 2: {e}")
+        import traceback
+        traceback.print_exc()
         data['summary_metrics']['trails_lifts_page']['scraping_error'] = str(e)
 
     print("\n" + "="*60)
-    print("SCRAPING COMPLETE - CANNON v2.0")
+    print("SCRAPING COMPLETE - CANNON v3.0")
+    print("="*60)
+    print(f"Lifts: {len(data['lifts'])}")
+    print(f"Trails: {len(data['trails'])}")
+    print(f"Glades: {len(data['glades'])}")
     print("="*60)
     
     return data
 
 def save_to_bronze(**context):
-    """Save to Bronze layer"""
+    """Save to Bronze layer in MinIO"""
     ti = context['ti']
     data = ti.xcom_pull(task_ids='scrape_snow_report')
     
     if not data:
-        raise ValueError("No data received")
+        raise ValueError("No data received from scraper")
     
     s3 = create_minio_client()
     
@@ -363,6 +491,14 @@ def save_to_bronze(**context):
     bucket_name = 'bronze-snow-reports'
     object_key = f'cannon/daily/{date_str}/{timestamp_str}.json'
     
+    # Ensure bucket exists
+    try:
+        s3.head_bucket(Bucket=bucket_name)
+    except:
+        s3.create_bucket(Bucket=bucket_name)
+        print(f"✓ Created bucket: {bucket_name}")
+    
+    # Save to MinIO
     json_data = json.dumps(data, indent=2)
     
     s3.put_object(
@@ -377,17 +513,17 @@ def save_to_bronze(**context):
         }
     )
     
-    print(f"✓ Saved: s3://{bucket_name}/{object_key}")
+    print(f"✓ Saved to MinIO: s3://{bucket_name}/{object_key}")
     return object_key
 
 with DAG(
-    dag_id='scrape_cannon_v2',
+    dag_id='scrape_cannon_v3',
     default_args=default_args,
-    description='Daily Cannon scrape (v2.0 - dual page)',
+    description='Daily Cannon scrape (v3.0 - proper HTML structure parsing)',
     schedule='0 12 * * *',
-    start_date=datetime(2026, 1, 22),
+    start_date=datetime(2026, 1, 26),
     catchup=False,
-    tags=['scraper', 'cannon', 'bronze', 'v2'],
+    tags=['scraper', 'cannon', 'bronze', 'v3'],
 ) as dag:
     
     scrape_task = PythonOperator(

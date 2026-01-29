@@ -22,10 +22,10 @@ import boto3
 from botocore.client import Config
 import os
 
-# Import transformation functions
-from transform_bretton_woods import transform_bretton_woods
-from transform_cannon import transform_cannon
-from transform_cranmore import transform_cranmore
+# Import transformation functions (using aliases to avoid naming collision with tasks)
+from transform_bretton_woods import transform_bretton_woods as bretton_woods_transform
+from transform_cannon import transform_cannon as cannon_transform
+from transform_cranmore import transform_cranmore as cranmore_transform
 
 default_args = {
     'owner': 'nettle',
@@ -152,7 +152,7 @@ def transform_bretton_task(**context):
     print("="*60)
     
     bronze_data = get_latest_bronze('bretton-woods')
-    silver_data = transform_bretton_woods(bronze_data)
+    silver_data = bretton_woods_transform(bronze_data)
     output_key = save_to_silver('bretton-woods', silver_data)
     
     # Summary
@@ -172,7 +172,7 @@ def transform_cannon_task(**context):
     print("="*60)
     
     bronze_data = get_latest_bronze('cannon')
-    silver_data = transform_cannon(bronze_data)
+    silver_data = cannon_transform(bronze_data)
     output_key = save_to_silver('cannon', silver_data)
     
     # Summary
@@ -193,7 +193,7 @@ def transform_cranmore_task(**context):
     print("="*60)
     
     bronze_data = get_latest_bronze('cranmore')
-    silver_data = transform_cranmore(bronze_data)
+    silver_data = cranmore_transform(bronze_data)
     output_key = save_to_silver('cranmore', silver_data)
     
     # Summary

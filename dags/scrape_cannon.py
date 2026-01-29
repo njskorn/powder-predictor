@@ -199,30 +199,51 @@ def scrape_cannon():
         
         # Extract Lifts from page 1 - v2.1 approach (was working)
         print("\n[3/4] Extracting lifts from Mountain Report...")
-        
+
         # Look for lifts table (v2.1 method that worked)
         lifts_section = soup1.find(string=re.compile(r'Lifts'))
         if lifts_section:
-            table = lifts_section.find_next('table')
+            table = lifts_section.find_parent().find_next('table')
             if table:
                 rows = table.find_all('tr')
+                
                 for row in rows:
-                    cells = row.find_all('td')
-                    if len(cells) >= 1:
-                        text = cells[0].get_text(strip=True)
-                        parts = text.split('  ')
-                        if len(parts) >= 1:
-                            name = parts[0].strip()
-                            hours = parts[1].strip() if len(parts) > 1 else None
-                            status = 'closed'
+                    try:
+                        # Get status from SVG circle fill color
+                        status = 'unknown'
+                        svg_circle = row.find('circle')
+                        if svg_circle:
+                            fill = svg_circle.get('fill', '').upper()
+                            if '27D94E' in fill:  # Green
+                                status = 'open'
+                            elif 'B52025' in fill:  # Red
+                                status = 'closed'
+                            elif 'FCDA00' in fill:  # Yellow
+                                status = 'on hold'
+                        
+                        # Find lift name in div with 'uppercase' class
+                        name_div = row.find('div', class_=lambda c: c and 'uppercase' in c if c else False)
+                        if name_div:
+                            name = name_div.get_text(strip=True)
                             
-                            if name and any(kw in name.lower() for kw in ['quad', 'triple', 'double', 'tram', 't-bar', 'tow', 'carpet']):
+                            # Find hours
+                            hours = None
+                            time_divs = row.find_all('div')
+                            for div in time_divs:
+                                text = div.get_text(strip=True)
+                                if ('a.m.' in text or 'p.m.' in text) and len(text) < 30:
+                                    hours = text
+                                    break
+                            
+                            if name:
                                 data['lifts'].append({
                                     'name': name,
                                     'status': status,
                                     'hours': hours
                                 })
-        
+                    except:
+                        continue
+
         print(f"   ✓ Extracted {len(data['lifts'])} lifts")
         
     except Exception as e:

@@ -37,12 +37,9 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    """API health check"""
-    return {
-        "status": "healthy",
-        "service": "Powder Predictor API",
-        "version": "1.0.0"
-    }
+    """Serve the dashboard"""
+    from fastapi.responses import FileResponse
+    return FileResponse("frontend/index.html")
 
 
 @app.get("/api/mountains")
@@ -100,39 +97,26 @@ async def get_summary():
     """
     Get high-level summary of all mountains
     
-    Returns quick stats: % open trails, temp, freshness
+    Returns quick stats for each mountain keyed by mountain name
     """
     mountains = ["bretton-woods", "cannon", "cranmore"]
-    summaries = []
+    result = {}
     
     for mountain in mountains:
         try:
             report = get_current_report(mountain)
-            summary = {
-                "mountain": mountain,
-                "display_name": mountain.replace("-", " ").title(),
-                "trails_open": report.get("summary", {}).get("trails", {}).get("percent", 0),
-                "lifts_open": report.get("summary", {}).get("lifts", {}).get("percent", 0),
-                "temperature": report.get("weather", {}).get("temperature_base", {}).get("value"),
-                "data_age_minutes": report.get("data_freshness", {}).get("age_minutes", 0),
-                "is_stale": report.get("data_freshness", {}).get("is_stale", True)
-            }
-            summaries.append(summary)
+            result[mountain] = report
         except Exception as e:
             logger.error(f"Error getting summary for {mountain}: {str(e)}")
-            summaries.append({
-                "mountain": mountain,
-                "error": str(e)
-            })
+            result[mountain] = {"error": str(e)}
     
-    return {"mountains": summaries}
+    return result
 
 
-# Mount static frontend files (HTML, CSS, JS)
-# This serves the dashboard UI
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
+# Mount static frontend files (CSS, JS)
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

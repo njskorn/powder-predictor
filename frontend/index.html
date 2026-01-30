@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Powder Predictor | NH Ski Conditions</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Powder Predictor</h1>
+            <p class="subtitle">Real-time conditions for NH ski mountains</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading mountain conditions...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="error hidden">
+            <p>⚠️ Unable to load mountain data</p>
+            <button onclick="location.reload()">Retry</button>
+        </div>
+
+        <!-- Mountain Cards Container -->
+        <div id="mountains" class="mountains-grid">
+            <!-- Mountain cards will be inserted here by JavaScript -->
+        </div>
+
+        <!-- Last Updated -->
+        <div id="last-updated" class="last-updated hidden">
+            <small>Last updated: <span id="update-time"></span></small>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Data refreshed every 30 minutes • Built with ❄️ for NH skiers</p>
+        </div>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

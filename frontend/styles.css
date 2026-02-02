@@ -257,6 +257,11 @@ header h1 {
     color: var(--black-diamond);
 }
 
+.difficulty-badge.glades {
+    /* Tree emoji, no color needed */
+    font-size: 1rem;
+}
+
 /* View Details Button */
 .view-details {
     width: 100%;

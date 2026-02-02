@@ -119,6 +119,12 @@ function renderMountainCard(mountain, data) {
                     <span class="difficulty-badge black">●</span>
                     <span>${trails.by_difficulty.black?.open || 0}/${trails.by_difficulty.black?.total || 0}</span>
                 </div>
+                ${trails.by_difficulty.glades ? `
+                <div class="difficulty-item">
+                    <span class="difficulty-badge glades">🌲</span>
+                    <span>${trails.by_difficulty.glades?.open || 0}/${trails.by_difficulty.glades?.total || 0}</span>
+                </div>
+                ` : ''}
             </div>
             ` : ''}
             

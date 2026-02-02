@@ -4,6 +4,7 @@ Cannon Mountain: Bronze → Silver Transformation
 
 Transforms raw Cannon scrape data into standardized Silver layer format
 Cannon has BASE and SUMMIT weather data
+NOTE: Glades are included in trail count since we love glades!
 """
 
 from datetime import datetime
@@ -57,51 +58,42 @@ def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
     # SECTION 1: Summary Metrics
     # ========================================================================
     
-    # Cannon has nested structure: summary_metrics.mountain_report_page
-    report_metrics = bronze_data.get('summary_metrics', {}).get('mountain_report_page', {})
+    # Lifts - count directly from array
+    bronze_lifts = bronze_data.get('lifts', [])
+    lifts_open = sum(1 for lift in bronze_lifts if lift.get('status') == 'open')
+    lifts_total = len(bronze_lifts)
+    silver['summary']['lifts'] = create_summary_metric(lifts_open, lifts_total)
     
-    # Lifts - reported as number, need to count total
-    lifts_open_str = report_metrics.get('open_lifts')
-    if lifts_open_str:
-        try:
-            lifts_open = int(lifts_open_str)
-            # Count total from lifts array
-            lifts_total = len(bronze_data.get('lifts', []))
-            silver['summary']['lifts'] = create_summary_metric(lifts_open, lifts_total)
-        except:
-            pass
-    
-    # If that didn't work, count from arrays
-    if not silver['summary']['lifts']:
-        bronze_lifts = bronze_data.get('lifts', [])
-        lifts_open = sum(1 for lift in bronze_lifts if lift.get('status') == 'open')
-        lifts_total = len(bronze_lifts)
-        silver['summary']['lifts'] = create_summary_metric(lifts_open, lifts_total)
-    
-    # Trails - same pattern
-    trails_open_str = report_metrics.get('open_trails')
-    if trails_open_str:
-        try:
-            trails_open = int(trails_open_str)
-            trails_total = len(bronze_data.get('trails', []))
-            silver['summary']['trails'] = create_summary_metric(trails_open, trails_total)
-        except:
-            pass
-    
-    if not silver['summary']['trails']:
-        bronze_trails = bronze_data.get('trails', [])
-        trails_open = sum(1 for trail in bronze_trails if trail.get('status') == 'open')
-        trails_total = len(bronze_trails)
-        silver['summary']['trails'] = create_summary_metric(trails_open, trails_total)
-    
-    # Add difficulty breakdown
+    # Trails + Glades COMBINED (we love glades!)
+    # Count from both arrays to get accurate totals
     bronze_trails = bronze_data.get('trails', [])
-    silver['summary']['trails']['by_difficulty'] = count_by_difficulty(bronze_trails)
-    
-    # Glades - count from glades array
     bronze_glades = bronze_data.get('glades', [])
+    
+    trails_open = sum(1 for trail in bronze_trails if trail.get('status') == 'open')
     glades_open = sum(1 for glade in bronze_glades if glade.get('status') == 'open')
+    
+    trails_total = len(bronze_trails)
     glades_total = len(bronze_glades)
+    
+    # Combined trail count includes glades
+    combined_open = trails_open + glades_open
+    combined_total = trails_total + glades_total
+    
+    silver['summary']['trails'] = create_summary_metric(combined_open, combined_total)
+    
+    # Add difficulty breakdown (green, blue, black) + glades as terrain type
+    difficulty_breakdown = count_by_difficulty(bronze_trails)
+    
+    # Add glades as separate category
+    difficulty_breakdown['glades'] = {
+        'open': glades_open,
+        'total': glades_total,
+        'percent': calculate_percent(glades_open, glades_total)
+    }
+    
+    silver['summary']['trails']['by_difficulty'] = difficulty_breakdown
+    
+    # Glades separate summary (for backwards compatibility)
     silver['summary']['glades'] = create_summary_metric(glades_open, glades_total)
     
     # ========================================================================
@@ -135,6 +127,7 @@ def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
             )
     
     # Recent snowfall - "new" means 24hr
+    report_metrics = bronze_data.get('summary_metrics', {}).get('mountain_report_page', {})
     snowfall_new = parse_snowfall(report_metrics.get('snowfall_new'))
     if snowfall_new:
         silver['weather']['snowfall_recent'] = create_weather_field(
@@ -210,50 +203,3 @@ def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         silver['glades'].append(silver_glade)
     
     return silver
-
-
-if __name__ == '__main__':
-    """Test with sample Bronze data"""
-    import json
-    
-    sample_bronze = {
-        "metadata": {
-            "mountain": "cannon",
-            "scraped_at": "2026-01-23T04:36:04.905268",
-            "scraper_version": "2.1"
-        },
-        "summary_metrics": {
-            "mountain_report_page": {
-                "open_trails": "92",
-                "open_lifts": "8",
-                "snowfall_new": "3\"",
-                "snowfall_to_date": "88\""
-            }
-        },
-        "weather": {
-            "base": {
-                "temperature_low": "23°F",
-                "temperature_high": "28°F",
-                "wind_direction": "W/SW",
-                "wind_speed": "5-12 mph"
-            },
-            "summit": {
-                "wind_direction": "W/SW",
-                "wind_speed": "17-25 mph"
-            }
-        },
-        "lifts": [
-            {"name": "Peabody Express Quad", "status": "open", "hours": "9:00 a.m."}
-        ],
-        "trails": [
-            {"name": "Zoomer", "status": "open", "area": "Upper Mountain",
-             "difficulty": "blue", "conditions": None, "night_skiing": False}
-        ],
-        "glades": [
-            {"name": "Kinsman Glade", "status": "open", "area": "Glades",
-             "difficulty": "black", "conditions": None}
-        ]
-    }
-    
-    silver = transform_cannon(sample_bronze)
-    print(json.dumps(silver, indent=2))

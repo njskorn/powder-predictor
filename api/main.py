@@ -1,88 +1,122 @@
-from fastapi import FastAPI
+"""
+Powder Predictor API
+====================
+
+FastAPI backend serving Silver layer snow reports from MinIO
+"""
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import os
-from pathlib import Path
-import boto3
-import json
-from datetime import datetime
-from dotenv import load_dotenv
+from fastapi.responses import JSONResponse
+import logging
+from typing import Dict, List
 
-# Load environment variables
-load_dotenv()
+from .minio_client import get_current_report, list_mountains
 
-app = FastAPI(title="Powder Predictor API")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-s3 = boto3.client(
-    's3',
-    endpoint_url='http://localhost:9000',
-    aws_access_key_id=os.getenv('MINIO_ROOT_USER'),
-    aws_secret_access_key=os.getenv('MINIO_ROOT_PASSWORD')
+# Initialize FastAPI
+app = FastAPI(
+    title="Powder Predictor API",
+    description="Real-time ski mountain conditions for NH mountains",
+    version="1.0.0"
 )
 
-# CORS middleware (allows web/ to call api/)
+# CORS middleware - allows frontend to call API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],  # In production, specify your domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/api/health")
-def health():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "powder-predictor"}
 
-@app.get("/api/conditions")
-def get_conditions():
-    """Get latest snow conditions - placeholder for now"""
+@app.get("/")
+async def root():
+    """Serve the dashboard"""
+    from fastapi.responses import FileResponse
+    return FileResponse("frontend/index.html")
+
+
+@app.get("/api/mountains")
+async def get_all_mountains():
+    """
+    Get current conditions for all mountains
+    
+    Returns aggregated data from Bretton Woods, Cannon, and Cranmore
+    """
+    mountains = ["bretton-woods", "cannon", "cranmore"]
+    results = {}
+    
+    for mountain in mountains:
+        try:
+            report = get_current_report(mountain)
+            results[mountain] = report
+            logger.info(f"Successfully retrieved {mountain} report")
+        except Exception as e:
+            logger.error(f"Error retrieving {mountain}: {str(e)}")
+            results[mountain] = {"error": str(e)}
+    
+    return results
+
+
+@app.get("/api/mountains/{mountain}")
+async def get_mountain(mountain: str):
+    """
+    Get current conditions for a specific mountain
+    
+    Args:
+        mountain: Mountain name (bretton-woods, cannon, or cranmore)
+    
+    Returns:
+        Current Silver layer report for the mountain
+    """
     try:
-        # get today's date
-        date_str = datetime.now().strftime('%Y-%m-%d')
-        s3_key = f'daily/{date_str}/conditions.json'
-
-        # fetch snow report data from MinIO
-        response = s3.get_object(Bucket='silver-snow-reports', Key=s3_key)
-        raw_data = json.loads(response['Body'].read().decode('utf-8'))
-
-        # Transform data to match front end expectations
-        mountains = []
-        for mountain in raw_data:
-            name_map = {
-                'cannon': 'Cannon Mountain',
-                'bretton-woods': 'Bretton Woods',
-                'cranmore': 'Cranmore'
-            }
-
-            transformed = {
-                'name':name_map.get(mountain['mountain_name'], mountain['mountain_name']),
-                'trails_open': f"{mountain['trails_open']}/{mountain['trails_total']}" if mountain['trails_open'] and mountain['trails_total'] else 'N/A',
-                'lifts_open': f"{mountain['lifts_open']}/{mountain['lifts_total']}" if mountain['lifts_open'] and mountain['lifts_total'] else 'N/A',
-                'recent_snow': f"{int(mountain['recent_snowfall_inches'])} inches" if mountain['recent_snowfall_inches'] else 'N/A',
-                'season_snow': f"{int(mountain['season_snowfall_inches'])} inches" if mountain['season_snowfall_inches'] else 'N/A',
-            }
-
-            mountains.append(transformed)
-
-        return {"mountains":mountains}
-    
-    except s3.exceptions.NoSuchKey:
-        # If today's data doesn't exist yet, return empty
-        return {
-            "mountains": [],
-            "message": f"No data for {date_str} yet. Run the scrapers!"
-        }
-    
+        report = get_current_report(mountain)
+        logger.info(f"Retrieved {mountain} report: {report.get('data_freshness', {})}")
+        return report
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No data found for mountain: {mountain}"
+        )
     except Exception as e:
-        return {
-            "mountains": [],
-            "message": f"Error: {str(e)}"
-        }
+        logger.error(f"Error retrieving {mountain}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving data: {str(e)}"
+        )
 
 
-# Mount static files (CSS, JS)
-BASE_DIR = Path(__file__).parent.parent
-WEB_DIR = BASE_DIR / "web"
-app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
+@app.get("/api/summary")
+async def get_summary():
+    """
+    Get high-level summary of all mountains
+    
+    Returns quick stats for each mountain keyed by mountain name
+    """
+    mountains = ["bretton-woods", "cannon", "cranmore"]
+    result = {}
+    
+    for mountain in mountains:
+        try:
+            report = get_current_report(mountain)
+            result[mountain] = report
+        except Exception as e:
+            logger.error(f"Error getting summary for {mountain}: {str(e)}")
+            result[mountain] = {"error": str(e)}
+    
+    return result
+
+
+# Mount static frontend files (CSS, JS)
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)

@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <h1>Powder Predictor</h1>
+            <h1>⛷️ Powder Predictor</h1>
             <p class="subtitle">Real-time conditions for NH ski mountains</p>
         </div>
     </header>
@@ -44,6 +44,34 @@
         </div>
     </footer>
 
+    <!-- Mountain Detail Modal -->
+    <div id="mountain-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <h2 id="modal-title">Mountain Name</h2>
+                <p id="modal-subtitle">Terrain Open - Last 30 Days</p>
+            </div>
+            <div class="modal-body">
+                <div class="chart-loading" id="chart-loading">
+                    <div class="spinner"></div>
+                    <p>Loading chart data...</p>
+                </div>
+                <div class="chart-container" id="chart-container">
+                    <canvas id="terrain-chart"></canvas>
+                </div>
+                
+                <!-- Snow Report Section -->
+                <div class="snow-report-section" id="snow-report-section">
+                    <h3>📝 Latest Snow Report</h3>
+                    <div id="snow-report-text" class="snow-report-text"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>

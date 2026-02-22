@@ -21,12 +21,21 @@ from .config import (
 logger = logging.getLogger(__name__)
 
 # Initialize S3 client for MinIO
+from botocore.config import Config
+
+boto_config = Config(
+    connect_timeout=5,
+    read_timeout=10,
+    retries={'max_attempts': 2}
+)
+
 s3_client = boto3.client(
     's3',
     endpoint_url=f'http{"s" if USE_SSL else ""}://{MINIO_ENDPOINT}',
     aws_access_key_id=MINIO_ACCESS_KEY,
     aws_secret_access_key=MINIO_SECRET_KEY,
-    region_name='us-east-1'
+    region_name='us-east-1',
+    config=boto_config
 )
 
 
@@ -110,3 +119,92 @@ def check_minio_connection() -> bool:
     except Exception as e:
         logger.error(f"MinIO connection failed: {e}")
         return False
+
+
+def get_historical_reports(mountain: str, days: int = 30) -> List[Dict]:
+    """
+    Get historical terrain data from Silver layer daily files
+    
+    Reads pre-computed terrain counts from Silver layer, avoiding 
+    duplicate work since Bronze→Silver transformation already did the counting
+    
+    Args:
+        mountain: Mountain name
+        days: Number of days to retrieve
+        
+    Returns:
+        List of daily terrain counts for charting
+    """
+    from datetime import datetime, timedelta
+    
+    history = []
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    logger.info(f"Fetching {days} days of history for {mountain} from Silver layer")
+    
+    current_date = start_date
+    while current_date <= end_date:
+        date_str = current_date.strftime('%Y-%m-%d')
+        prefix = f"{mountain}/daily/{date_str}/"
+        
+        logger.info(f"Checking {date_str} for {mountain}...")
+        
+        try:
+            # List Silver files for this date
+            logger.debug(f"Listing objects with prefix: {prefix}")
+            response = s3_client.list_objects_v2(
+                Bucket=SILVER_BUCKET,
+                Prefix=prefix,
+                MaxKeys=1  # Just get the first (most recent) file for this day
+            )
+            logger.debug(f"List response received for {date_str}")
+            
+            if 'Contents' in response and len(response['Contents']) > 0:
+                # Get the most recent Silver file for this day
+                key = response['Contents'][0]['Key']
+                logger.debug(f"Found file: {key}")
+                
+                obj_response = s3_client.get_object(
+                    Bucket=SILVER_BUCKET,
+                    Key=key
+                )
+                content = obj_response['Body'].read().decode('utf-8')
+                silver_data = json.loads(content)
+                
+                # Extract pre-computed terrain counts from Silver
+                trails = silver_data.get('summary', {}).get('trails', {})
+                by_diff = trails.get('by_difficulty', {})
+                
+                green = by_diff.get('green', {}).get('open', 0)
+                blue = by_diff.get('blue', {}).get('open', 0)
+                black = by_diff.get('black', {}).get('open', 0)
+                glades = by_diff.get('glades', {}).get('open', 0)
+                total = trails.get('open', 0)
+                
+                # Skip days with broken difficulty data (all zeros but non-zero total)
+                # This happens when scraper/transformation had issues
+                if total > 0 and (green + blue + black + glades) == 0:
+                    logger.debug(f"Skipping {date_str} - broken difficulty breakdown")
+                    current_date += timedelta(days=1)
+                    continue
+                
+                history.append({
+                    'date': date_str,
+                    'green': green,
+                    'blue': blue,
+                    'black': black,
+                    'glades': glades,
+                    'total': total
+                })
+                logger.info(f"✓ Added data for {date_str}")
+            else:
+                logger.debug(f"No files found for {date_str}")
+                
+        except Exception as e:
+            logger.warning(f"Error for {date_str}: {e}")
+            
+        current_date += timedelta(days=1)
+    
+    logger.info(f"Retrieved {len(history)} days of data for {mountain}")
+    return history

@@ -18,6 +18,7 @@ Bretton Woods Specific Features:
 """
 
 from airflow import DAG
+from airflow.models import Variable
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import requests
@@ -408,6 +409,17 @@ def save_to_bronze(**context):
     
     return object_key
 
+def ping_healthcheck(**context):
+    """Ping Healthchecks.io after successful scrape"""
+    try:
+        ping_url = Variable.get('healthchecks_bretton_url')
+        response = requests.get(ping_url, timeout=10)
+        
+        if response.status_code == 200:
+            print("Successfully pinged Healthchecks.io")
+    except Exception as e:
+        print(f"Could not ping Healthchecks.io: {e}")
+
 # Define the DAG
 with DAG(
     dag_id='scrape_bretton_woods_v2',
@@ -419,14 +431,23 @@ with DAG(
     tags=['scraper', 'bretton-woods', 'bronze', 'v2'],
 ) as dag:
     
+    # Task 1: Scrape the website
     scrape_task = PythonOperator(
         task_id='scrape_snow_report',
         python_callable=scrape_bretton_woods,
     )
     
+    # Task 2: Save to Bronze layer
     save_task = PythonOperator(
         task_id='save_to_bronze',
         python_callable=save_to_bronze,
     )
+
+    # Task 3: healthcheck
+    healthcheck_task = PythonOperator(
+        task_id='ping_healthcheck',
+        python_callable=ping_healthcheck,
+    )
     
-    scrape_task >> save_task
+    # Define dependency
+    scrape_task >> save_task >> healthcheck_task

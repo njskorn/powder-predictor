@@ -550,20 +550,23 @@ with DAG(
     tags=['scraper', 'cannon', 'bronze', 'v3'],
 ) as dag:
     
+    # Task 1: Scrape the website
     scrape_task = PythonOperator(
         task_id='scrape_snow_report',
         python_callable=scrape_cannon,
     )
     
+    # Task 2: Save to Bronze layer
     save_task = PythonOperator(
         task_id='save_to_bronze',
         python_callable=save_to_bronze,
     )
 
-    # healthcheck ping
+    # Task 3: healthcheck
     healthcheck_task = PythonOperator(
         task_id='ping_healthcheck',
         python_callable=ping_healthcheck,
     )
     
-    scrape_task >> save_task
+    # Define dependency
+    scrape_task >> save_task >> healthcheck_task

@@ -45,6 +45,7 @@ Architecture:
 """
 
 from airflow import DAG
+from airflow.models import Variable
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import requests
@@ -516,6 +517,29 @@ def save_to_bronze(**context):
     print(f"✓ Saved to MinIO: s3://{bucket_name}/{object_key}")
     return object_key
 
+def ping_healthcheck(**context):
+    """
+    Ping Healthchecks.io after successful scrape
+    
+    This is called only if the scrape + save succeeded
+    """
+    try:
+        # Get the ping URL from Airflow Variables
+        ping_url = Variable.get('healthchecks_cannon_url')
+        
+        # Ping Healthchecks.io
+        response = requests.get(ping_url, timeout=10)
+        
+        if response.status_code == 200:
+            print("Successfully pinged Healthchecks.io")
+        else:
+            print(f"Healthchecks ping returned status {response.status_code}")
+            
+    except Exception as e:
+        # Don't fail the DAG if healthcheck ping fails
+        # This is monitoring, not critical path
+        print(f"Could not ping Healthchecks.io: {e}")
+
 with DAG(
     dag_id='scrape_cannon_v3',
     default_args=default_args,
@@ -534,6 +558,12 @@ with DAG(
     save_task = PythonOperator(
         task_id='save_to_bronze',
         python_callable=save_to_bronze,
+    )
+
+    # healthcheck ping
+    healthcheck_task = PythonOperator(
+        task_id='ping_healthcheck',
+        python_callable=ping_healthcheck,
     )
     
     scrape_task >> save_task

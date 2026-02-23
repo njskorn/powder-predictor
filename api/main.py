@@ -92,6 +92,38 @@ async def get_mountain(mountain: str):
         )
 
 
+@app.get("/api/mountains/{mountain}/history")
+async def get_mountain_history(mountain: str, days: int = 30):
+    """
+    Get historical terrain data for charting
+    
+    Args:
+        mountain: Mountain name (bretton-woods, cannon, or cranmore)
+        days: Number of days to retrieve (default 30, max 90)
+    
+    Returns:
+        Time series data with terrain counts by difficulty
+    """
+    from datetime import datetime, timedelta
+    from .minio_client import get_historical_reports
+    
+    try:
+        # Limit to 90 days max
+        days = min(days, 90)
+        
+        # Get historical data
+        history = get_historical_reports(mountain, days)
+        
+        return {
+            "mountain": mountain,
+            "days": days,
+            "data": history
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving history for {mountain}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/summary")
 async def get_summary():
     """

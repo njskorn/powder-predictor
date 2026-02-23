@@ -174,11 +174,8 @@ async function viewDetails(mountain) {
  * Show detail modal (placeholder for now)
  */
 function showDetailModal(mountain, data) {
-    // For now, just log to console
-    console.log(`Details for ${mountain}:`, data);
-    
-    // TODO: Implement modal with full trail/lift lists
-    alert(`Full details for ${mountain}\n\nTrails: ${data.trails?.length || 0}\nLifts: ${data.lifts?.length || 0}\nGlades: ${data.glades?.length || 0}\n\n(Full modal coming soon!)`);
+    // Open the modal with chart and data
+    openModal(mountain);
 }
 
 /**
@@ -202,6 +199,224 @@ function showError() {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('error').classList.remove('hidden');
 }
+
+/**
+ * Modal and Chart Functions
+ */
+let currentChart = null;
+
+async function openModal(mountain) {
+    const modal = document.getElementById('mountain-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const chartLoading = document.getElementById('chart-loading');
+    const chartContainer = document.getElementById('chart-container');
+    
+    // Set title
+    const displayName = mountain.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    modalTitle.textContent = displayName;
+    
+    // Show modal
+    modal.classList.add('show');
+    
+    // Show loading, hide chart
+    chartLoading.style.display = 'block';
+    chartContainer.classList.remove('show');
+    
+    try {
+        // Fetch both historical data and current data in parallel
+        const [historyResponse, currentResponse] = await Promise.all([
+            fetch(`${API_BASE}/mountains/${mountain}/history?days=30`),
+            fetch(`${API_BASE}/mountains/${mountain}`)
+        ]);
+        
+        const historyResult = await historyResponse.json();
+        const currentData = await currentResponse.json();
+        
+        // Hide loading, show chart
+        chartLoading.style.display = 'none';
+        chartContainer.classList.add('show');
+        
+        // Render chart
+        renderChart(historyResult.data);
+        
+        // Display snow report
+        const snowReportText = document.getElementById('snow-report-text');
+        const report = currentData.snow_report || currentData.narrative_report || '';
+        snowReportText.textContent = report || 'No snow report available';
+        
+    } catch (error) {
+        console.error('Error loading modal data:', error);
+        chartLoading.innerHTML = '<p>Error loading data</p>';
+    }
+}
+
+function closeModal() {
+    const modal = document.getElementById('mountain-modal');
+    modal.classList.remove('show');
+    
+    // Destroy chart to clean up
+    if (currentChart) {
+        currentChart.destroy();
+        currentChart = null;
+    }
+}
+
+function renderChart(data) {
+    const canvas = document.getElementById('terrain-chart');
+    const ctx = canvas.getContext('2d');
+    
+    // Destroy previous chart if exists
+    if (currentChart) {
+        currentChart.destroy();
+    }
+    
+    // Prepare data
+    const dates = data.map(d => d.date);
+    const greenData = data.map(d => d.green);
+    const blueData = data.map(d => d.blue);
+    const blackData = data.map(d => d.black);
+    const gladesData = data.map(d => d.glades);
+    
+    // Weekend shading plugin
+    const weekendShading = {
+        id: 'weekendShading',
+        beforeDraw: (chart) => {
+            const ctx = chart.ctx;
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+            
+            ctx.save();
+            
+            dates.forEach((dateStr, index) => {
+                const date = new Date(dateStr);
+                const dayOfWeek = date.getDay();
+                
+                // 0 = Sunday, 6 = Saturday
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                    const x = xAxis.getPixelForValue(index);
+                    const nextX = index < dates.length - 1 ? xAxis.getPixelForValue(index + 1) : xAxis.right;
+                    const width = nextX - x;
+                    
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+                    ctx.fillRect(x, yAxis.top, width, yAxis.bottom - yAxis.top);
+                }
+            });
+            
+            ctx.restore();
+        }
+    };
+    
+    // Create chart
+    currentChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates.map(d => {
+                const date = new Date(d);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
+            datasets: [
+                {
+                    label: 'Beginner',
+                    data: greenData,
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Intermediate',
+                    data: blueData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Advanced',
+                    data: blackData,
+                    borderColor: '#1e293b',
+                    backgroundColor: 'rgba(30, 41, 59, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Glades',
+                    data: gladesData,
+                    borderColor: '#16a34a',
+                    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false,
+                    borderDash: [5, 5]
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            const index = context[0].dataIndex;
+                            const date = new Date(dates[index]);
+                            const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+                            return `${dayOfWeek}, ${context[0].label}`;
+                        },
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y} trails`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Trails Open'
+                    },
+                    ticks: {
+                        stepSize: 5
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            }
+        },
+        plugins: [weekendShading]
+    });
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('mountain-modal');
+    if (event.target === modal) {
+        closeModal();
+    }
+});
 
 /**
  * Initialize dashboard

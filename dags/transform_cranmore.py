@@ -61,6 +61,33 @@ def transform_cranmore(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
     
     processed_at = datetime.now().isoformat()
     source_scraped_at = bronze_data['metadata'].get('scraped_at', processed_at)
+
+    # Separate glades from trails if needed (for old Bronze files)
+    bronze_trails = bronze_data.get('trails', [])
+    bronze_glades = bronze_data.get('glades', [])
+    
+    KNOWN_GLADES = ['Gibson Chutes', 'Jughandle', 'Red Line']
+    
+    # Extract glades from trails (handles old Bronze format)
+    glades_from_trails = [
+        trail for trail in bronze_trails
+        if 'glade' in trail.get('name', '').lower() 
+           or trail.get('name') in KNOWN_GLADES
+    ]
+    
+    # Add to bronze_glades list
+    bronze_glades.extend(glades_from_trails)
+    
+    # Remove glades from trails
+    bronze_trails = [
+        trail for trail in bronze_trails
+        if 'glade' not in trail.get('name', '').lower()
+           and trail.get('name') not in KNOWN_GLADES
+    ]
+    
+    # Store back in bronze_data so rest of code can use them
+    bronze_data['trails'] = bronze_trails
+    bronze_data['glades'] = bronze_glades
     
     # Initialize Silver structure
     silver = {
@@ -123,6 +150,22 @@ def transform_cranmore(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
     glades_open = sum(1 for glade in bronze_glades if glade.get('status') == 'open')
     glades_total = len(bronze_glades)
     silver['summary']['glades'] = create_summary_metric(glades_open, glades_total)
+
+    # Glades summary
+    bronze_glades = bronze_data.get('glades', [])
+    glades_open = sum(1 for glade in bronze_glades if glade.get('status') == 'open')
+    glades_total = len(bronze_glades)
+    silver['summary']['glades'] = create_summary_metric(glades_open, glades_total)
+
+    # ADD THIS: Also add glades to difficulty breakdown
+    if 'by_difficulty' not in silver['summary']['trails']:
+        silver['summary']['trails']['by_difficulty'] = {}
+
+    silver['summary']['trails']['by_difficulty']['glades'] = {
+        'open': glades_open,
+        'total': glades_total,
+        'percent': round((glades_open / glades_total * 100) if glades_total > 0 else 0)
+    }
     
     # ========================================================================
     # SECTION 2: Weather
@@ -186,10 +229,25 @@ def transform_cranmore(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         silver['lifts'].append(silver_lift)
     
     # ========================================================================
-    # SECTION 4: Trails (detailed - glades already separated in Bronze v2.1+)
+    # SECTION 4: Glades (detailed - now in separate array in Bronze v2.1+)
+    # ========================================================================
+
+    for bronze_glade in bronze_glades:
+        print(bronze_glade)
+        silver_glade = {
+            'name': bronze_glade.get('name'),
+            'status': bronze_glade.get('status'),
+            'area': 'main',
+            'difficulty': standardize_difficulty(bronze_glade.get('difficulty'))
+        }
+        
+        silver['glades'].append(silver_glade)
+
+    # ========================================================================
+    # SECTION 5: Trails (detailed - glades already separated in Bronze v2.1+)
     # ========================================================================
     
-    for bronze_trail in bronze_data.get('trails', []):
+    for bronze_trail in bronze_trails:
         silver_trail = {
             'name': bronze_trail.get('name'),
             'status': bronze_trail.get('status'),
@@ -200,20 +258,6 @@ def transform_cranmore(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         silver['trails'].append(silver_trail)
-    
-    # ========================================================================
-    # SECTION 5: Glades (detailed - now in separate array in Bronze v2.1+)
-    # ========================================================================
-    
-    for bronze_glade in bronze_data.get('glades', []):
-        silver_glade = {
-            'name': bronze_glade.get('name'),
-            'status': bronze_glade.get('status'),
-            'area': 'main',
-            'difficulty': standardize_difficulty(bronze_glade.get('difficulty'))
-        }
-        
-        silver['glades'].append(silver_glade)
     
     return silver
 

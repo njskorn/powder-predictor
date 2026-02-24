@@ -94,6 +94,20 @@ def transform_bretton_woods(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         glades_open = sum(1 for glade in bronze_glades if glade.get('status') == 'open')
         glades_total = len(bronze_glades)
         silver['summary']['glades'] = create_summary_metric(glades_open, glades_total)
+
+    # Add glades to difficulty breakdown
+    bronze_glades = bronze_data.get('glades', [])
+    glades_open = sum(1 for g in bronze_glades if g.get('status') == 'open')
+    glades_total = len(bronze_glades)
+    
+    if 'by_difficulty' not in silver['summary']['trails']:
+        silver['summary']['trails']['by_difficulty'] = {}
+    
+    silver['summary']['trails']['by_difficulty']['glades'] = {
+        'open': glades_open,
+        'total': glades_total,
+        'percent': round((glades_open / glades_total * 100) if glades_total > 0 else 0)
+    }
     
     # ========================================================================
     # SECTION 2: Weather

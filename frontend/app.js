@@ -262,6 +262,11 @@ function closeModal() {
 }
 
 function renderChart(data) {
+    // DEBUG: Log the data we received
+    console.log('Chart data received:', data);
+    console.log('Feb 7:', data.find(d => d.date === '2026-02-07'));
+    console.log('Feb 9:', data.find(d => d.date === '2026-02-09'));
+    
     const canvas = document.getElementById('terrain-chart');
     const ctx = canvas.getContext('2d');
     
@@ -345,7 +350,7 @@ function renderChart(data) {
                 {
                     label: 'Glades',
                     data: gladesData,
-                    borderColor: '#16a34a',
+                    borderColor: '#065f46',
                     backgroundColor: 'rgba(22, 163, 74, 0.1)',
                     borderWidth: 2,
                     tension: 0.3,

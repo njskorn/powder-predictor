@@ -134,7 +134,7 @@ def scrape_cranmore():
     # ========================================================================
     # SECTION 1: Extract Summary Metrics (datapoint divs)
     # ========================================================================
-    print("\n[1/6] Extracting summary metrics...")
+    print("\n[1/7] Extracting summary metrics...")
     try:
         datapoints = soup.find_all('div', class_='datapoint')
         
@@ -162,20 +162,20 @@ def scrape_cranmore():
                 elif 'Season Total' in label:
                     data['summary_metrics']['season_total'] = val
         
-        print(f"   ✓ Extracted {len(data['summary_metrics'])} summary metrics")
+        print(f"Extracted {len(data['summary_metrics'])} summary metrics")
     except Exception as e:
-        print(f"   ✗ Warning: Could not extract summary metrics: {e}")
+        print(f"Warning: Could not extract summary metrics: {e}")
         data['summary_metrics']['extraction_error'] = str(e)
 
     # ========================================================================
-    # SECTION 2: Extract Weather Data (NEW in v2.0)
+    # SECTION 2: Extract Weather Data
     # ========================================================================
     # Weather might appear in:
     # - Dedicated weather section
     # - Datapoint divs (like temperature, wind)
     # - Narrative text (as fallback)
     
-    print("\n[2/6] Extracting weather data...")
+    print("\n[2/7] Extracting weather data...")
     try:
         # Look for temperature in datapoints
         for dp in soup.find_all('div', class_='datapoint'):
@@ -211,17 +211,17 @@ def scrape_cranmore():
         # We'll parse the narrative text for weather mentions
         
         if data['weather']:
-            print(f"   ✓ Extracted {len(data['weather'])} weather fields")
+            print(f"Extracted {len(data['weather'])} weather fields")
         else:
-            print(f"   ℹ No structured weather data found (Cranmore may not report it)")
+            print(f"No structured weather data found (Cranmore may not report it)")
             
     except Exception as e:
-        print(f"   ✗ Warning: Could not extract weather data: {e}")
+        print(f"Warning: Could not extract weather data: {e}")
 
     # ========================================================================
     # SECTION 3: Extract Narrative Report
     # ========================================================================
-    print("\n[3/6] Extracting narrative report...")
+    print("\n[3/7] Extracting narrative report...")
     try:
         report_elem = soup.find(string=lambda text: text and 'Report:' in text)
         
@@ -247,15 +247,15 @@ def scrape_cranmore():
         if last_updated:
             data['metadata']['last_updated'] = last_updated.strip()
         
-        print(f"   ✓ Extracted narrative ({len(data['narrative_report'])} chars)")
+        print(f"Extracted narrative ({len(data['narrative_report'])} chars)")
     except Exception as e:
-        print(f"   ✗ Warning: Could not extract narrative: {e}")
+        print(f"Warning: Could not extract narrative: {e}")
         data['narrative_report'] = ''
 
     # ========================================================================
     # SECTION 4: Extract Individual Lifts (with capacity - NEW in v2.0)
     # ========================================================================
-    print("\n[4/6] Extracting lift details...")
+    print("\n[4/7] Extracting lift details...")
     try:
         lifts_header = soup.find('h2', string='Lifts')
         
@@ -292,14 +292,14 @@ def scrape_cranmore():
                             }
                             data['lifts'].append(lift)
         
-        print(f"   ✓ Extracted {len(data['lifts'])} lifts (with capacity)")
+        print(f"Extracted {len(data['lifts'])} lifts (with capacity)")
     except Exception as e:
-        print(f"   ✗ Warning: Could not extract lifts: {e}")
+        print(f"Warning: Could not extract lifts: {e}")
 
     # ========================================================================
     # SECTION 5: Extract Individual Trails
     # ========================================================================
-    print("\n[5/6] Extracting trail details...")
+    print("\n[5/7] Extracting trail details...")
     try:
         trails_header = soup.find('h2', string='Trails')
         
@@ -345,14 +345,14 @@ def scrape_cranmore():
                             }
                             data['trails'].append(trail)
         
-        print(f"   ✓ Extracted {len(data['trails'])} trails")
+        print(f"Extracted {len(data['trails'])} trails")
     except Exception as e:
-        print(f"   ✗ Warning: Could not extract trails: {e}")
+        print(f"Warning: Could not extract trails: {e}")
 
     # ========================================================================
     # SECTION 6: Separate Terrain Parks from Trails
     # ========================================================================
-    print("\n[6/6] Separating terrain parks...")
+    print("\n[6/7] Separating terrain parks...")
     try:
         # Filter trails for terrain parks (difficulty == "park")
         data['terrain_parks'] = [
@@ -366,9 +366,39 @@ def scrape_cranmore():
             if trail.get('difficulty') != 'park'
         ]
         
-        print(f"   ✓ Found {len(data['terrain_parks'])} terrain parks")
+        print(f"Found {len(data['terrain_parks'])} terrain parks")
     except Exception as e:
-        print(f"   ✗ Warning: Could not separate terrain parks: {e}")
+        print(f"Warning: Could not separate terrain parks: {e}")
+
+    # ========================================================================
+    # SECTION 7: Separate Glades from Trails
+    # ========================================================================
+
+    # Known glades that aren't labeled as "glade" in the data
+    KNOWN_GLADES = ['Gibson Chutes', 'Jughandle', 'Red Line']
+
+    print("\n[7/7] Separating glades...")
+    try:
+        # Filter trails with "glade" in name OR in known glades list
+        data['glades'] = [
+            {**trail}
+            for trail in data['trails']
+            if 'glade' in trail.get('name', '').lower() 
+            or trail.get('name') in KNOWN_GLADES
+        ]
+        
+        # Remove glades from main trails list
+        data['trails'] = [
+            trail for trail in data['trails']
+            if 'glade' not in trail.get('name', '').lower()
+            and trail.get('name') not in KNOWN_GLADES
+        ]
+        
+        print(f"Found {len(data['glades'])} glades")
+
+    except Exception as e:
+        print(f"Warning: Could not separate terrain parks/glades: {e}")
+
 
     # ========================================================================
     # Final summary
@@ -380,6 +410,7 @@ def scrape_cranmore():
     print(f"Weather Data: {len(data['weather'])} fields")
     print(f"Lifts: {len(data['lifts'])} items (with capacity)")
     print(f"Trails: {len(data['trails'])} items")
+    print(f"Glades: {len(data['glades'])} items")
     print(f"Terrain Parks: {len(data['terrain_parks'])} items")
     print(f"Narrative: {len(data['narrative_report'])} chars")
     print("="*60 + "\n")
@@ -421,8 +452,8 @@ def save_to_bronze(**context):
         }
     )
     
-    print(f"✓ Saved to Bronze layer: s3://{bucket_name}/{object_key}")
-    print(f"✓ File size: {len(json_data)} bytes")
+    print(f"Saved to Bronze layer: s3://{bucket_name}/{object_key}")
+    print(f"File size: {len(json_data)} bytes")
     
     return object_key
 

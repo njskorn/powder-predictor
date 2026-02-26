@@ -184,8 +184,47 @@ def get_historical_reports(mountain: str, days: int = 30) -> List[Dict]:
                 
                 # Skip days with broken difficulty data (all zeros but non-zero total)
                 # This happens when scraper/transformation had issues
-                if total > 0 and (green + blue + black + glades) == 0:
-                    logger.debug(f"Skipping {date_str} - broken difficulty breakdown")
+                breakdown_sum = green + blue + black + glades
+                if total > 0:
+                    if breakdown_sum == 0:
+                        # All zeros - completely broken
+                        logger.debug(f"Skipping {date_str} - all difficulties are zero")
+                        history.append({
+                            'date': date_str,
+                            'green': None,
+                            'blue': None,
+                            'black': None,
+                            'glades': None,
+                            'total': None
+                        })
+                        current_date += timedelta(days=1)
+                        continue
+                    elif breakdown_sum < total * 0.5:
+                        # Breakdown accounts for less than 50% of total - partially broken
+                        logger.debug(f"Skipping {date_str} - breakdown ({breakdown_sum}) << total ({total})")
+                        history.append({
+                            'date': date_str,
+                            'green': None,
+                            'blue': None,
+                            'black': None,
+                            'glades': None,
+                            'total': None
+                        })
+                        current_date += timedelta(days=1)
+                        continue
+                
+                # NEW: Also skip if everything is zero (scraper failure)
+                # Cannon never closes completely, so all zeros = bad data
+                if total == 0 and breakdown_sum == 0:
+                    logger.debug(f"Skipping {date_str} - scraper failure (all zeros)")
+                    history.append({
+                        'date': date_str,
+                        'green': None,
+                        'blue': None,
+                        'black': None,
+                        'glades': None,
+                        'total': None
+                    })
                     current_date += timedelta(days=1)
                     continue
                 
@@ -200,9 +239,27 @@ def get_historical_reports(mountain: str, days: int = 30) -> List[Dict]:
                 logger.info(f"✓ Added data for {date_str}")
             else:
                 logger.debug(f"No files found for {date_str}")
+
+                history.append({
+                    'date': date_str,
+                    'green': None,
+                    'blue': None,
+                    'black': None,
+                    'glades': None,
+                    'total': None
+                })
                 
         except Exception as e:
             logger.warning(f"Error for {date_str}: {e}")
+
+            history.append({
+                'date': date_str,
+                'green': None,
+                'blue': None,
+                'black': None,
+                'glades': None,
+                'total': None
+            })
             
         current_date += timedelta(days=1)
     

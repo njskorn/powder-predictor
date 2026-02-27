@@ -104,6 +104,7 @@ def transform_cranmore(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
             'trails': {},
             'glades': {}
         },
+        'narrative_report': bronze_data.get('narrative_report', ''),
         'weather': {},
         'lifts': [],
         'trails': [],

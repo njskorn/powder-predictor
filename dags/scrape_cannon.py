@@ -121,6 +121,7 @@ def scrape_cannon():
             'base': {},
             'summit': {}
         },
+        'narrative_report': '',
         'lifts': [],
         'trails': [],
         'glades': []
@@ -245,7 +246,18 @@ def scrape_cannon():
                     except:
                         continue
 
-        print(f"   ✓ Extracted {len(data['lifts'])} lifts")
+        print(f"Extracted {len(data['lifts'])} lifts")
+
+        parse_text = soup1.find('div', class_='parse-text')
+        if parse_text:
+            # Get all text, preserving line breaks
+            data['narrative_report'] = parse_text.get_text(separator='\n', strip=True)
+            # Count paragraphs to verify we got content
+            para_count = len(parse_text.find_all('p'))
+            print(f"Extracted narrative report ({para_count} paragraphs, {len(data['narrative_report'])} chars)")
+        else:
+            print("Warning: Could not find narrative snow report (.parse-text)")
+
         
     except Exception as e:
         print(f"   ✗ ERROR on page 1: {e}")

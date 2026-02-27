@@ -46,6 +46,7 @@ def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
             'glades': {}
         },
         'weather': {},
+        'narrative_report': bronze_data.get('narrative_report', ''),
         'lifts': [],
         'trails': [],
         'glades': []

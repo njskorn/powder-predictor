@@ -10,9 +10,6 @@ Data collected:
 - Current conditions (temp, wind, precipitation)
 - 7-day forecast
 - Observation station metadata
-
-Author: Powder Predictor Team
-Version: 1.0
 """
 
 import requests
@@ -87,7 +84,7 @@ def get_gridpoint_data(lat: float, lon: float) -> Optional[Dict[str, Any]]:
         }
         
     except Exception as e:
-        print(f"   ✗ Error fetching gridpoint: {e}")
+        print(f"Error fetching gridpoint: {e}")
         return None
 
 
@@ -112,13 +109,13 @@ def get_observation_station(stations_url: str) -> Optional[str]:
         if data['features'] and len(data['features']) > 0:
             station_url = data['features'][0]['id']
             station_id = station_url.split('/')[-1]
-            print(f"   ✓ Using station: {station_id}")
+            print(f"   Using station: {station_id}")
             return station_url
         
         return None
         
     except Exception as e:
-        print(f"   ✗ Error fetching stations: {e}")
+        print(f"Error fetching stations: {e}")
         return None
 
 
@@ -190,13 +187,13 @@ def get_current_observations(station_url: str) -> Optional[Dict[str, Any]]:
             'raw_message': props.get('rawMessage')
         }
         
-        print(f"   ✓ Temperature: {observations['temperature']['value']}°C")
-        print(f"   ✓ Wind: {observations['wind_speed']['value']} {observations['wind_speed']['unit']}")
+        print(f"   Temperature: {observations['temperature']['value']}°C")
+        print(f"   Wind: {observations['wind_speed']['value']} {observations['wind_speed']['unit']}")
         
         return observations
         
     except Exception as e:
-        print(f"   ✗ Error fetching observations: {e}")
+        print(f"Error fetching observations: {e}")
         return None
 
 
@@ -237,7 +234,7 @@ def get_forecast(forecast_url: str) -> Optional[Dict[str, Any]]:
                 'detailed_forecast': period.get('detailedForecast')
             })
         
-        print(f"   ✓ Retrieved {len(periods)} forecast periods")
+        print(f"Retrieved {len(periods)} forecast periods")
         
         return {
             'updated': data['properties']['updated'],
@@ -245,7 +242,7 @@ def get_forecast(forecast_url: str) -> Optional[Dict[str, Any]]:
         }
         
     except Exception as e:
-        print(f"   ✗ Error fetching forecast: {e}")
+        print(f"Error fetching forecast: {e}")
         return None
 
 
@@ -287,7 +284,7 @@ def scrape_mountain_weather(mountain_id: str, mountain_data: Dict[str, Any]) -> 
     gridpoint = get_gridpoint_data(mountain_data['lat'], mountain_data['lon'])
     
     if not gridpoint:
-        print("✗ Failed to get gridpoint data")
+        print("Failed to get gridpoint data")
         return weather_data
     
     weather_data['gridpoint'] = gridpoint
@@ -302,7 +299,7 @@ def scrape_mountain_weather(mountain_id: str, mountain_data: Dict[str, Any]) -> 
         observations = get_current_observations(station_url)
         weather_data['current_conditions'] = observations
     else:
-        print("✗ No observation station found")
+        print("No observation station found")
     
     # Step 3: Get forecast
     print("\n[3/3] Getting 7-day forecast...")

@@ -204,37 +204,49 @@ function showError() {
  * Modal and Chart Functions
  */
 let currentChart = null;
+let currentMountain = null;
 
-async function openModal(mountain) {
+async function openModal(mountain, days = 30) {
     const modal = document.getElementById('mountain-modal');
     const modalTitle = document.getElementById('modal-title');
     const chartLoading = document.getElementById('chart-loading');
     const chartContainer = document.getElementById('chart-container');
+    const timeRangeSelector = document.getElementById('time-range-selector');
+    
+    // Store current mountain for time range changes
+    currentMountain = mountain;
     
     // Set title
     const displayName = mountain.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     modalTitle.textContent = displayName;
     
+    // Update active time range button
+    document.querySelectorAll('.time-range-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.days) === days);
+    });
+    
     // Show modal
     modal.classList.add('show');
     
-    // Show loading, hide chart
+    // Show loading, hide chart and time selector
     chartLoading.style.display = 'block';
     chartContainer.classList.remove('show');
+    timeRangeSelector.style.display = 'none';
     
     try {
         // Fetch both historical data and current data in parallel
         const [historyResponse, currentResponse] = await Promise.all([
-            fetch(`${API_BASE}/mountains/${mountain}/history?days=30`),
+            fetch(`${API_BASE}/mountains/${mountain}/history?days=${days}`),
             fetch(`${API_BASE}/mountains/${mountain}`)
         ]);
         
         const historyResult = await historyResponse.json();
         const currentData = await currentResponse.json();
         
-        // Hide loading, show chart
+        // Hide loading, show chart and time selector
         chartLoading.style.display = 'none';
         chartContainer.classList.add('show');
+        timeRangeSelector.style.display = 'flex';
         
         // Render chart
         renderChart(historyResult.data);
@@ -262,11 +274,6 @@ function closeModal() {
 }
 
 function renderChart(data) {
-    // DEBUG: Log the data we received
-    console.log('Chart data received:', data);
-    console.log('Feb 7:', data.find(d => d.date === '2026-02-07'));
-    console.log('Feb 9:', data.find(d => d.date === '2026-02-09'));
-    
     const canvas = document.getElementById('terrain-chart');
     const ctx = canvas.getContext('2d');
     
@@ -281,6 +288,25 @@ function renderChart(data) {
     const blueData = data.map(d => d.blue);
     const blackData = data.map(d => d.black);
     const gladesData = data.map(d => d.glades);
+    
+    // Adaptive point size based on data density
+    // 7 days = bigger points, 90 days = tiny points
+    let pointRadius, pointHoverRadius;
+    const dataLength = data.length;
+    
+    if (dataLength <= 10) {
+        // 7 days - large points
+        pointRadius = 4;
+        pointHoverRadius = 6;
+    } else if (dataLength <= 40) {
+        // 30 days - small points
+        pointRadius = 2;
+        pointHoverRadius = 3.5;
+    } else {
+        // 90 days (season) - tiny points
+        pointRadius = 1.2;
+        pointHoverRadius = 2.5;
+    }
     
     // Weekend shading plugin
     const weekendShading = {
@@ -302,7 +328,7 @@ function renderChart(data) {
                     const nextX = index < dates.length - 1 ? xAxis.getPixelForValue(index + 1) : xAxis.right;
                     const width = nextX - x;
                     
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+                    ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';  // Subtle light shade for dark mode
                     ctx.fillRect(x, yAxis.top, width, yAxis.bottom - yAxis.top);
                 }
             });
@@ -323,39 +349,47 @@ function renderChart(data) {
                 {
                     label: 'Beginner',
                     data: greenData,
-                    borderColor: '#22c55e',
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    borderWidth: 2,
+                    borderColor: '#10b981',  // Brighter green for dark mode
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 3,  // Thicker lines
                     tension: 0.3,
-                    fill: false
+                    fill: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
                 },
                 {
                     label: 'Intermediate',
                     data: blueData,
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    borderWidth: 2,
+                    borderColor: '#60a5fa',  // Lighter blue
+                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                    borderWidth: 3,
                     tension: 0.3,
-                    fill: false
+                    fill: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
                 },
                 {
                     label: 'Advanced',
                     data: blackData,
-                    borderColor: '#1e293b',
-                    backgroundColor: 'rgba(30, 41, 59, 0.1)',
-                    borderWidth: 2,
+                    borderColor: '#e2e8f0',  // Light gray/white - very visible on dark!
+                    backgroundColor: 'rgba(226, 232, 240, 0.1)',
+                    borderWidth: 3,
                     tension: 0.3,
-                    fill: false
+                    fill: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
                 },
                 {
                     label: 'Glades',
                     data: gladesData,
-                    borderColor: '#065f46',
-                    backgroundColor: 'rgba(22, 163, 74, 0.1)',
-                    borderWidth: 2,
+                    borderColor: '#059669',  // Dark forest green (already good)
+                    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                    borderWidth: 3,
                     tension: 0.3,
                     fill: false,
-                    borderDash: [5, 5]
+                    borderDash: [5, 5],
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
                 }
             ]
         },
@@ -371,10 +405,22 @@ function renderChart(data) {
                     position: 'top',
                     labels: {
                         usePointStyle: true,
-                        padding: 15
+                        padding: 15,
+                        color: '#cbd5e1',  // Light gray for legend text
+                        font: {
+                            size: 12,
+                            weight: '600'
+                        }
                     }
                 },
                 tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    titleColor: '#f1f5f9',
+                    bodyColor: '#cbd5e1',
+                    borderColor: 'rgba(148, 163, 184, 0.3)',
+                    borderWidth: 1,
+                    padding: 12,
+                    boxPadding: 6,
                     callbacks: {
                         title: function(context) {
                             const index = context[0].dataIndex;
@@ -393,20 +439,38 @@ function renderChart(data) {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Trails Open'
+                        text: 'Trails Open',
+                        color: '#cbd5e1',  // Light gray text
+                        font: {
+                            size: 13,
+                            weight: '600'
+                        }
                     },
                     ticks: {
-                        stepSize: 5
+                        stepSize: 5,
+                        color: '#94a3b8'  // Lighter gray for tick labels
+                    },
+                    grid: {
+                        color: 'rgba(148, 163, 184, 0.1)'  // Subtle grid lines
                     }
                 },
                 x: {
                     title: {
                         display: true,
-                        text: 'Date'
+                        text: 'Date',
+                        color: '#cbd5e1',
+                        font: {
+                            size: 13,
+                            weight: '600'
+                        }
                     },
                     ticks: {
                         maxRotation: 45,
-                        minRotation: 45
+                        minRotation: 45,
+                        color: '#94a3b8'
+                    },
+                    grid: {
+                        color: 'rgba(148, 163, 184, 0.1)'
                     }
                 }
             }
@@ -421,6 +485,16 @@ document.addEventListener('click', function(event) {
     if (event.target === modal) {
         closeModal();
     }
+});
+
+// Time range selector event listeners
+document.querySelectorAll('.time-range-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const days = parseInt(this.dataset.days);
+        if (currentMountain) {
+            openModal(currentMountain, days);
+        }
+    });
 });
 
 /**

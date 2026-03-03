@@ -282,12 +282,34 @@ function renderChart(data) {
         currentChart.destroy();
     }
     
-    // Prepare data
-    const dates = data.map(d => d.date);
-    const greenData = data.map(d => d.green);
-    const blueData = data.map(d => d.blue);
-    const blackData = data.map(d => d.black);
-    const gladesData = data.map(d => d.glades);
+    // Generate full date range (API skips missing dates, we need to show gaps)
+    const allDates = [];
+    const dataByDate = {};
+    
+    // Build lookup from API data
+    data.forEach(d => {
+        dataByDate[d.date] = d;
+    });
+    
+    // Find date range
+    if (data.length > 0) {
+        const firstDate = new Date(data[0].date);
+        const lastDate = new Date(data[data.length - 1].date);
+        
+        // Generate all dates in range
+        let currentDate = new Date(firstDate);
+        while (currentDate <= lastDate) {
+            allDates.push(currentDate.toISOString().split('T')[0]);
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+    }
+    
+    // Map data to full date range, use null for missing dates
+    const dates = allDates;
+    const greenData = dates.map(date => dataByDate[date]?.green ?? null);
+    const blueData = dates.map(date => dataByDate[date]?.blue ?? null);
+    const blackData = dates.map(date => dataByDate[date]?.black ?? null);
+    const gladesData = dates.map(date => dataByDate[date]?.glades ?? null);
     
     // Adaptive point size based on data density
     // 7 days = bigger points, 90 days = tiny points
@@ -354,6 +376,7 @@ function renderChart(data) {
                     borderWidth: 3,  // Thicker lines
                     tension: 0.3,
                     fill: false,
+                    spanGaps: false,  // Show gaps for missing data
                     pointRadius: pointRadius,
                     pointHoverRadius: pointHoverRadius
                 },
@@ -365,6 +388,7 @@ function renderChart(data) {
                     borderWidth: 3,
                     tension: 0.3,
                     fill: false,
+                    spanGaps: false,
                     pointRadius: pointRadius,
                     pointHoverRadius: pointHoverRadius
                 },
@@ -376,6 +400,7 @@ function renderChart(data) {
                     borderWidth: 3,
                     tension: 0.3,
                     fill: false,
+                    spanGaps: false,
                     pointRadius: pointRadius,
                     pointHoverRadius: pointHoverRadius
                 },
@@ -387,6 +412,7 @@ function renderChart(data) {
                     borderWidth: 3,
                     tension: 0.3,
                     fill: false,
+                    spanGaps: false,
                     borderDash: [5, 5],
                     pointRadius: pointRadius,
                     pointHoverRadius: pointHoverRadius

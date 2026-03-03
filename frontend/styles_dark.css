@@ -465,6 +465,132 @@ header h1 {
     font-style: italic;
 }
 
+/* Weather Charts Section */
+.weather-charts-section {
+    margin-top: var(--space-xl);
+}
+
+#weather-charts-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.weather-chart-wrapper {
+    position: relative;
+    padding: var(--space-lg);
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.weather-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.weather-chart-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.remove-chart-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.remove-chart-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.weather-chart-canvas {
+    height: 300px;
+}
+
+/* Add Chart Button */
+.add-chart-container {
+    position: relative;
+    margin-top: var(--space-lg);
+}
+
+.add-chart-btn {
+    width: 100%;
+    padding: var(--space-md);
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px dashed var(--accent-blue);
+    border-radius: var(--radius-md);
+    color: var(--accent-blue);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-chart-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-style: solid;
+}
+
+/* Chart Selector Dropdown */
+.chart-selector-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    margin-bottom: var(--space-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 10;
+    overflow: hidden;
+}
+
+.chart-selector-dropdown.hidden {
+    display: none;
+}
+
+.chart-option {
+    padding: var(--space-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid var(--border);
+}
+
+.chart-option:last-child {
+    border-bottom: none;
+}
+
+.chart-option:hover {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.chart-icon {
+    font-size: 1.5rem;
+}
+
+.chart-option span:last-child {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
 /* ============================================================
    LOADING & ERROR STATES
    ============================================================ */

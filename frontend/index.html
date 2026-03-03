@@ -69,6 +69,37 @@
                     <canvas id="terrain-chart"></canvas>
                 </div>
                 
+                <!-- Weather Charts Section -->
+                <div class="weather-charts-section" id="weather-charts-section" style="display: none;">
+                    <!-- Weather charts will be added here dynamically -->
+                    <div id="weather-charts-container"></div>
+                    
+                    <!-- Add Chart Button -->
+                    <div class="add-chart-container">
+                        <button class="add-chart-btn" id="add-weather-chart-btn">
+                            + Add Weather Chart
+                        </button>
+                        <div class="chart-selector-dropdown hidden" id="chart-selector">
+                            <div class="chart-option" data-chart="temperature">
+                                <span class="chart-icon">🌡️</span>
+                                <span>Temperature (High/Low)</span>
+                            </div>
+                            <div class="chart-option" data-chart="snow">
+                                <span class="chart-icon">❄️</span>
+                                <span>Snowfall & Depth</span>
+                            </div>
+                            <div class="chart-option" data-chart="wind">
+                                <span class="chart-icon">💨</span>
+                                <span>Wind Speed & Gusts</span>
+                            </div>
+                            <div class="chart-option" data-chart="humidity">
+                                <span class="chart-icon">💧</span>
+                                <span>Humidity</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Snow Report Section -->
                 <div class="snow-report-section" id="snow-report-section">
                     <h3>📝 Latest Snow Report</h3>

@@ -216,6 +216,11 @@ async function openModal(mountain, days = 30) {
     // Store current mountain for time range changes
     currentMountain = mountain;
     
+    // Clear any existing weather charts
+    const weatherContainer = document.getElementById('weather-charts-container');
+    weatherContainer.innerHTML = '';
+    weatherCharts = {};
+    
     // Set title
     const displayName = mountain.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     modalTitle.textContent = displayName;
@@ -234,22 +239,30 @@ async function openModal(mountain, days = 30) {
     timeRangeSelector.style.display = 'none';
     
     try {
-        // Fetch both historical data and current data in parallel
-        const [historyResponse, currentResponse] = await Promise.all([
+        // Fetch terrain, weather, and current data in parallel
+        const [terrainResponse, weatherResponse, currentResponse] = await Promise.all([
             fetch(`${API_BASE}/mountains/${mountain}/history?days=${days}`),
+            fetch(`${API_BASE}/mountains/${mountain}/weather-history?days=${days}`),
             fetch(`${API_BASE}/mountains/${mountain}`)
         ]);
         
-        const historyResult = await historyResponse.json();
+        const terrainResult = await terrainResponse.json();
+        const weatherResult = await weatherResponse.json();
         const currentData = await currentResponse.json();
+        
+        // Store weather data globally for chart rendering
+        window.currentWeatherData = weatherResult.data;
         
         // Hide loading, show chart and time selector
         chartLoading.style.display = 'none';
         chartContainer.classList.add('show');
         timeRangeSelector.style.display = 'flex';
         
-        // Render chart
-        renderChart(historyResult.data);
+        // Show weather charts section
+        document.getElementById('weather-charts-section').style.display = 'block';
+        
+        // Render terrain chart
+        renderChart(terrainResult.data);
         
         // Display snow report
         const snowReportText = document.getElementById('snow-report-text');
@@ -266,11 +279,21 @@ function closeModal() {
     const modal = document.getElementById('mountain-modal');
     modal.classList.remove('show');
     
-    // Destroy chart to clean up
+    // Destroy terrain chart to clean up
     if (currentChart) {
         currentChart.destroy();
         currentChart = null;
     }
+    
+    // Clear weather charts
+    const container = document.getElementById('weather-charts-container');
+    container.innerHTML = '';
+    weatherCharts = {};
+    
+    // Hide weather section
+    document.getElementById('weather-charts-section').style.display = 'none';
+    
+    currentMountain = null;
 }
 
 function renderChart(data) {
@@ -522,6 +545,343 @@ document.querySelectorAll('.time-range-btn').forEach(btn => {
         }
     });
 });
+
+/**
+ * Weather Charts Functionality
+ */
+let weatherCharts = {}; // Track active weather charts by type
+let weatherChartCounter = 0; // Unique ID for each chart instance
+
+// Toggle chart selector dropdown
+document.getElementById('add-weather-chart-btn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const dropdown = document.getElementById('chart-selector');
+    dropdown.classList.toggle('hidden');
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('chart-selector');
+    const btn = document.getElementById('add-weather-chart-btn');
+    
+    if (!dropdown.contains(event.target) && event.target !== btn) {
+        dropdown.classList.add('hidden');
+    }
+    
+    // Also close modal when clicking outside
+    const modal = document.getElementById('mountain-modal');
+    if (event.target === modal) {
+        closeModal();
+    }
+});
+
+// Handle chart option selection
+document.querySelectorAll('.chart-option').forEach(option => {
+    option.addEventListener('click', function() {
+        const chartType = this.dataset.chart;
+        addWeatherChart(chartType);
+        document.getElementById('chart-selector').classList.add('hidden');
+    });
+});
+
+function addWeatherChart(type) {
+    // Check if this chart type is already added
+    if (weatherCharts[type]) {
+        return; // Don't add duplicates
+    }
+    
+    const container = document.getElementById('weather-charts-container');
+    const chartId = `weather-chart-${type}-${weatherChartCounter++}`;
+    
+    // Chart titles and icons
+    const chartInfo = {
+        temperature: { title: 'Temperature (High/Low)', icon: '🌡️' },
+        snow: { title: 'Snowfall & Depth', icon: '❄️' },
+        wind: { title: 'Wind Speed & Gusts', icon: '💨' },
+        humidity: { title: 'Humidity', icon: '💧' }
+    };
+    
+    const info = chartInfo[type];
+    
+    // Create chart wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'weather-chart-wrapper';
+    wrapper.dataset.chartType = type;
+    wrapper.innerHTML = `
+        <div class="weather-chart-header">
+            <div class="weather-chart-title">
+                <span>${info.icon}</span>
+                <span>${info.title}</span>
+            </div>
+            <button class="remove-chart-btn" onclick="removeWeatherChart('${type}')">× Remove</button>
+        </div>
+        <div class="weather-chart-canvas">
+            <canvas id="${chartId}"></canvas>
+        </div>
+    `;
+    
+    container.appendChild(wrapper);
+    
+    // Render the chart
+    renderWeatherChart(type, chartId);
+    
+    // Track this chart
+    weatherCharts[type] = chartId;
+}
+
+function removeWeatherChart(type) {
+    const container = document.getElementById('weather-charts-container');
+    const wrapper = container.querySelector(`[data-chart-type="${type}"]`);
+    
+    if (wrapper) {
+        // Destroy the chart instance
+        const chartId = weatherCharts[type];
+        const chartInstance = Chart.getChart(chartId);
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+        
+        // Remove from DOM
+        wrapper.remove();
+        
+        // Remove from tracking
+        delete weatherCharts[type];
+    }
+}
+
+function renderWeatherChart(type, canvasId) {
+    const data = window.currentWeatherData;
+    
+    if (!data || data.length === 0) {
+        return;
+    }
+    
+    // Generate full date range with nulls for missing dates
+    const allDates = [];
+    const dataByDate = {};
+    
+    data.forEach(d => {
+        dataByDate[d.date] = d;
+    });
+    
+    if (data.length > 0) {
+        const firstDate = new Date(data[0].date);
+        const lastDate = new Date(data[data.length - 1].date);
+        
+        let currentDate = new Date(firstDate);
+        while (currentDate <= lastDate) {
+            allDates.push(currentDate.toISOString().split('T')[0]);
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+    }
+    
+    const dates = allDates;
+    
+    // Adaptive point size based on data length
+    let pointRadius, pointHoverRadius;
+    const dataLength = dates.length;
+    
+    if (dataLength <= 10) {
+        pointRadius = 4;
+        pointHoverRadius = 6;
+    } else if (dataLength <= 40) {
+        pointRadius = 2;
+        pointHoverRadius = 3.5;
+    } else {
+        pointRadius = 1.2;
+        pointHoverRadius = 2.5;
+    }
+    
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    let datasets, yAxisConfig, tooltipLabel;
+    
+    switch(type) {
+        case 'temperature':
+            datasets = [
+                {
+                    label: 'High',
+                    data: dates.map(date => dataByDate[date]?.temp_max ?? null),
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
+                },
+                {
+                    label: 'Low',
+                    data: dates.map(date => dataByDate[date]?.temp_min ?? null),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
+                },
+                {
+                    label: 'Freezing (32°F)',
+                    data: dates.map(() => 32),
+                    borderColor: '#94a3b8',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: false
+                }
+            ];
+            yAxisConfig = {
+                title: { display: true, text: 'Temperature (°F)', color: '#cbd5e1', font: { size: 13, weight: '600' } }
+            };
+            tooltipLabel = (context) => `${context.dataset.label}: ${context.parsed.y}°F`;
+            break;
+            
+        case 'snow':
+            datasets = [
+                {
+                    label: 'New Snow (24hr)',
+                    data: dates.map(date => dataByDate[date]?.snow ?? null),
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
+                },
+                {
+                    label: 'Snow Depth',
+                    data: dates.map(date => dataByDate[date]?.snowdepth ?? null),
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
+                }
+            ];
+            yAxisConfig = {
+                title: { display: true, text: 'Snow (inches)', color: '#cbd5e1', font: { size: 13, weight: '600' } }
+            };
+            tooltipLabel = (context) => `${context.dataset.label}: ${context.parsed.y}"`;
+            break;
+            
+        case 'wind':
+            datasets = [
+                {
+                    label: 'Wind Speed',
+                    data: dates.map(date => dataByDate[date]?.wind_speed ?? null),
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
+                },
+                {
+                    label: 'Gusts',
+                    data: dates.map(date => dataByDate[date]?.wind_gust ?? null),
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
+                }
+            ];
+            yAxisConfig = {
+                title: { display: true, text: 'Wind (mph)', color: '#cbd5e1', font: { size: 13, weight: '600' } }
+            };
+            tooltipLabel = (context) => `${context.dataset.label}: ${context.parsed.y} mph`;
+            break;
+            
+        case 'humidity':
+            datasets = [
+                {
+                    label: 'Humidity',
+                    data: dates.map(date => dataByDate[date]?.humidity ?? null),
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: false,
+                    spanGaps: false,
+                    pointRadius: pointRadius,
+                    pointHoverRadius: pointHoverRadius
+                }
+            ];
+            yAxisConfig = {
+                title: { display: true, text: 'Humidity (%)', color: '#cbd5e1', font: { size: 13, weight: '600' } },
+                min: 0,
+                max: 100
+            };
+            tooltipLabel = (context) => `${context.dataset.label}: ${context.parsed.y}%`;
+            break;
+    }
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: { labels: dates, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        color: '#cbd5e1',
+                        font: { size: 12, weight: '600' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    titleColor: '#f1f5f9',
+                    bodyColor: '#cbd5e1',
+                    borderColor: 'rgba(148, 163, 184, 0.3)',
+                    borderWidth: 1,
+                    padding: 12,
+                    boxPadding: 6,
+                    callbacks: {
+                        label: tooltipLabel
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ...yAxisConfig,
+                    ticks: { color: '#94a3b8' },
+                    grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                },
+                x: {
+                    title: { display: true, text: 'Date', color: '#cbd5e1', font: { size: 13, weight: '600' } },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        color: '#94a3b8'
+                    },
+                    grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                }
+            }
+        }
+    });
+}
 
 /**
  * Initialize dashboard

@@ -182,51 +182,22 @@ def get_historical_reports(mountain: str, days: int = 30) -> List[Dict]:
                 glades = by_diff.get('glades', {}).get('open', 0)
                 total = trails.get('open', 0)
                 
-                # Skip days with broken difficulty data (all zeros but non-zero total)
-                # This happens when scraper/transformation had issues
+                # Skip days with broken difficulty data
+                # Case 1: Total > 0 but ALL difficulties are zero
+                # Case 2: Total > 0 but breakdown sum is way off (e.g., 98 total but only 23 in glades)
                 breakdown_sum = green + blue + black + glades
+                
                 if total > 0:
                     if breakdown_sum == 0:
                         # All zeros - completely broken
                         logger.debug(f"Skipping {date_str} - all difficulties are zero")
-                        history.append({
-                            'date': date_str,
-                            'green': None,
-                            'blue': None,
-                            'black': None,
-                            'glades': None,
-                            'total': None
-                        })
                         current_date += timedelta(days=1)
                         continue
                     elif breakdown_sum < total * 0.5:
                         # Breakdown accounts for less than 50% of total - partially broken
                         logger.debug(f"Skipping {date_str} - breakdown ({breakdown_sum}) << total ({total})")
-                        history.append({
-                            'date': date_str,
-                            'green': None,
-                            'blue': None,
-                            'black': None,
-                            'glades': None,
-                            'total': None
-                        })
                         current_date += timedelta(days=1)
                         continue
-                
-                # NEW: Also skip if everything is zero (scraper failure)
-                # Cannon never closes completely, so all zeros = bad data
-                if total == 0 and breakdown_sum == 0:
-                    logger.debug(f"Skipping {date_str} - scraper failure (all zeros)")
-                    history.append({
-                        'date': date_str,
-                        'green': None,
-                        'blue': None,
-                        'black': None,
-                        'glades': None,
-                        'total': None
-                    })
-                    current_date += timedelta(days=1)
-                    continue
                 
                 history.append({
                     'date': date_str,
@@ -239,29 +210,86 @@ def get_historical_reports(mountain: str, days: int = 30) -> List[Dict]:
                 logger.info(f"✓ Added data for {date_str}")
             else:
                 logger.debug(f"No files found for {date_str}")
-
-                history.append({
-                    'date': date_str,
-                    'green': None,
-                    'blue': None,
-                    'black': None,
-                    'glades': None,
-                    'total': None
-                })
                 
         except Exception as e:
             logger.warning(f"Error for {date_str}: {e}")
-
-            history.append({
-                'date': date_str,
-                'green': None,
-                'blue': None,
-                'black': None,
-                'glades': None,
-                'total': None
-            })
             
         current_date += timedelta(days=1)
     
     logger.info(f"Retrieved {len(history)} days of data for {mountain}")
+    return history
+
+
+def get_weather_history(mountain: str, days: int = 30) -> List[Dict]:
+    """
+    Get historical weather data from Silver layer
+    
+    Reads weather from Silver: weather/{mountain}/daily/{date}.json
+    
+    Args:
+        mountain: Mountain name
+        days: Number of days to retrieve
+        
+    Returns:
+        List of daily weather data for charting
+    """
+    from datetime import datetime, timedelta
+    
+    history = []
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    logger.info(f"Fetching {days} days of weather history for {mountain} from Silver layer")
+    
+    current_date = start_date
+    while current_date <= end_date:
+        date_str = current_date.strftime('%Y-%m-%d')
+        key = f"weather/{mountain}/daily/{date_str}.json"
+        
+        try:
+            # Get weather file for this date
+            response = s3_client.get_object(
+                Bucket=SILVER_BUCKET,
+                Key=key
+            )
+            
+            content = response['Body'].read().decode('utf-8')
+            weather_data = json.loads(content)
+            
+            # Extract actual weather (not forecasts)
+            actual = weather_data.get('actual', {})
+            
+            # Build chart-friendly data structure
+            history.append({
+                'date': date_str,
+                'temp_max': actual.get('temperature', {}).get('max'),
+                'temp_min': actual.get('temperature', {}).get('min'),
+                'temp_avg': actual.get('temperature', {}).get('avg'),
+                'feels_like_max': actual.get('feels_like', {}).get('max'),
+                'feels_like_min': actual.get('feels_like', {}).get('min'),
+                'snow': actual.get('snow', {}).get('new_snow'),
+                'snowdepth': actual.get('snow', {}).get('depth'),
+                'precip': actual.get('precipitation', {}).get('total'),
+                'wind_speed': actual.get('wind', {}).get('speed'),
+                'wind_gust': actual.get('wind', {}).get('gust'),
+                'humidity': actual.get('conditions', {}).get('humidity'),
+                'conditions': actual.get('conditions', {}).get('conditions'),
+                'description': actual.get('conditions', {}).get('description')
+            })
+            
+            logger.debug(f"✓ Added weather for {date_str}")
+            
+        except ClientError as e:
+            # File doesn't exist for this date - that's okay, just skip
+            if e.response['Error']['Code'] == 'NoSuchKey':
+                logger.debug(f"No weather data for {date_str}")
+            else:
+                logger.warning(f"Error fetching weather for {date_str}: {e}")
+                
+        except Exception as e:
+            logger.warning(f"Error processing weather for {date_str}: {e}")
+            
+        current_date += timedelta(days=1)
+    
+    logger.info(f"Retrieved {len(history)} days of weather data for {mountain}")
     return history

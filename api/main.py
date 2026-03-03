@@ -124,6 +124,37 @@ async def get_mountain_history(mountain: str, days: int = 30):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/mountains/{mountain}/weather-history")
+async def get_weather_history(mountain: str, days: int = 30):
+    """
+    Get historical weather data for charting
+    
+    Args:
+        mountain: Mountain name (bretton-woods, cannon, or cranmore)
+        days: Number of days to retrieve (default 30, max 90)
+    
+    Returns:
+        Time series weather data with temp, snow, wind, conditions
+    """
+    from .minio_client import get_weather_history
+    
+    try:
+        # Limit to 90 days max
+        days = min(days, 90)
+        
+        # Get historical weather data
+        history = get_weather_history(mountain, days)
+        
+        return {
+            "mountain": mountain,
+            "days": days,
+            "data": history
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving weather history for {mountain}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/summary")
 async def get_summary():
     """

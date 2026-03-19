@@ -50,26 +50,34 @@ def summarize_report(text: str, max_summary_words: int = 100) -> str:
     Returns:
         Summarized text, or original if too short/error
     """
+    print(f"Starting summarization...")
+    print(f"Input length: {len(text.split())} words")
+
     if not text or len(text.strip()) == 0:
+        print("Empty text, returning empty")
         return ""
     
     words = text.split()
     
     # Skip if too short to summarize
     if len(words) < 30:
+        print(f"Too short ({len(words)} words), returning original")
         return text
     
     # Truncate if too long (model limit ~1024 tokens)
-    max_input_words = 700
+    max_input_words = 200
     if len(words) > max_input_words:
+        print(f"Truncating from {len(words)} to {max_input_words} words")
         text = ' '.join(words[:max_input_words])
     
     try:
+        print("Getting summarizer...")
         summarizer = get_summarizer()
         
         # Calculate output length based on target
-        max_len = min(260, max_summary_words * 1.3)  # Allow some buffer
-        min_len = min(60, max_len - 40)
+        print("Running inference (this may take 30-60s)...")
+        max_len = min(150, max_summary_words * 1.2)  # Allow some buffer
+        min_len = min(40, max_len - 30)
         
         result = summarizer(
             text,
@@ -81,11 +89,12 @@ def summarize_report(text: str, max_summary_words: int = 100) -> str:
         )
         
         summary = result[0]['summary_text']
+        print(f"Generated summary: {len(summary.split())} words")
         return summary
         
     except Exception as e:
         print(f"Summarization error: {e}")
-        print(f" Returning original text")
+        print(f"Returning original text")
         return text
 
 

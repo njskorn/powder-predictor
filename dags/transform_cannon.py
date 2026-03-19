@@ -15,6 +15,8 @@ from silver_utils import (
     calculate_age_minutes, count_by_difficulty, create_weather_field,
     create_summary_metric
 )
+from summarize_snow_report import summarize_report
+
 
 def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -47,6 +49,7 @@ def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         },
         'weather': {},
         'narrative_report': bronze_data.get('narrative_report', ''),
+        'narrative_summary': '', 
         'lifts': [],
         'trails': [],
         'glades': []
@@ -202,5 +205,12 @@ def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         silver['glades'].append(silver_glade)
+
+    # ========================================================================
+    # SECTION 6: summary snow report
+    # ========================================================================
+    # moved to separate DAG
+    # narrative_summary = summarize_report(silver['narrative_report'], max_summary_words=100)
+    # silver['narrative_summary'] = narrative_summary
     
     return silver

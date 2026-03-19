@@ -15,7 +15,6 @@ from silver_utils import (
     calculate_age_minutes, count_by_difficulty, create_weather_field,
     create_summary_metric
 )
-from summarize_snow_report import summarize_report
 
 
 def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:

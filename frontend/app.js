@@ -263,10 +263,22 @@ async function openModal(mountain, days = 30) {
         
         // Render terrain chart
         renderChart(terrainResult.data);
-        
-        // Display snow report
+
+        // Display snow report (in openModal function)
         const snowReportText = document.getElementById('snow-report-text');
+        const snowSummaryText = document.getElementById('snow-summary-text');
+        const snowSummaryContainer = document.getElementById('snow-summary-container');
+
         const report = currentData.snow_report || currentData.narrative_report || '';
+        const summary = currentData.narrative_summary || '';
+
+        // Show summary if it exists
+        if (summary && summary.length > 0) {
+            snowSummaryText.textContent = summary;
+            snowSummaryContainer.style.display = 'block';
+        }
+
+        // Show full report
         snowReportText.textContent = report || 'No snow report available';
         
     } catch (error) {

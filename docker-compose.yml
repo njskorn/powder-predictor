@@ -32,6 +32,7 @@ services:
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      _PIP_ADDITIONAL_REQUIREMENTS: 'transformers==4.36.0 torch==2.1.0 sentencepiece==0.1.99'
     volumes:
       - ./dags:/opt/airflow/dags
       - ./src:/opt/airflow/src
@@ -62,6 +63,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      _PIP_ADDITIONAL_REQUIREMENTS: 'transformers==4.36.0 torch==2.1.0 sentencepiece==0.1.99'  # ADD THIS LINE
     volumes:
       - ./dags:/opt/airflow/dags
       - ./src:/opt/airflow/src

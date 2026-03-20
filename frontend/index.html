@@ -102,8 +102,18 @@
                 
                 <!-- Snow Report Section -->
                 <div class="snow-report-section" id="snow-report-section">
-                    <h3>📝 Latest Snow Report</h3>
-                    <div id="snow-report-text" class="snow-report-text"></div>
+                    <h3>Latest Snow Report</h3>
+                    <!-- DistilBART Summary (new) -->
+                    <div id="snow-summary-container" class="snow-summary-container" style="display: none;">
+                        <h4>Snow Report Summary</h4>
+                        <div id="snow-summary-text" class="snow-summary-text"></div>
+                    </div>
+                    
+                    <!-- Full Report -->
+                    <details>
+                        <summary>Full Report</summary>
+                        <div id="snow-report-text" class="snow-report-text"></div>
+                    </details>
                 </div>
             </div>
         </div>

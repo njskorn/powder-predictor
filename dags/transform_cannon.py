@@ -16,6 +16,7 @@ from silver_utils import (
     create_summary_metric
 )
 
+
 def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Transform Cannon Mountain Bronze layer data to Silver layer
@@ -47,6 +48,7 @@ def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         },
         'weather': {},
         'narrative_report': bronze_data.get('narrative_report', ''),
+        'narrative_summary': '', 
         'lifts': [],
         'trails': [],
         'glades': []
@@ -202,5 +204,12 @@ def transform_cannon(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         silver['glades'].append(silver_glade)
+
+    # ========================================================================
+    # SECTION 6: summary snow report
+    # ========================================================================
+    # moved to separate DAG
+    # narrative_summary = summarize_report(silver['narrative_report'], max_summary_words=100)
+    # silver['narrative_summary'] = narrative_summary
     
     return silver

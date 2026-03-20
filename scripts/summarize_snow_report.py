@@ -65,7 +65,7 @@ def summarize_report(text: str, max_summary_words: int = 100) -> str:
         return text
     
     # Truncate if too long (model limit ~1024 tokens)
-    max_input_words = 200
+    max_input_words = 700
     if len(words) > max_input_words:
         print(f"Truncating from {len(words)} to {max_input_words} words")
         text = ' '.join(words[:max_input_words])
@@ -76,8 +76,8 @@ def summarize_report(text: str, max_summary_words: int = 100) -> str:
         
         # Calculate output length based on target
         print("Running inference (this may take 30-60s)...")
-        max_len = min(150, max_summary_words * 1.2)  # Allow some buffer
-        min_len = min(40, max_len - 30)
+        max_len = min(250, max_summary_words * 1.2)  # Allow some buffer
+        min_len = min(60, max_len - 30)
         
         result = summarizer(
             text,
@@ -99,17 +99,14 @@ def summarize_report(text: str, max_summary_words: int = 100) -> str:
 
 
 if __name__ == '__main__':
-    # Test
     test_text = """
-    Cannon Mountain received 2 inches of new snow overnight. All trails and lifts 
-    are currently open. The base depth is 48 inches at the summit. Conditions are 
-    excellent with fresh powder and groomed runs available. The Front Five trails 
-    are in great shape. Mittersill area opened with all expert terrain accessible.
-    Temperatures are expected to stay cold through the weekend, preserving snow quality.
-    Snowmaking operations continue on select trails. Parking lots are at 60% capacity.
+    Cannon received 3 inches overnight. Grooming excellent on Front Five.
+    Base depth 52 inches. All lifts operating. Tonight's concert at 7pm!
+    Shop our spring sale - 40% off!
     """
     
     print("Testing summarization...")
     summary = summarize_report(test_text)
-    print(f"\nOriginal ({len(test_text.split())} words):\n{test_text}")
-    print(f"\nSummary ({len(summary.split())} words):\n{summary}")
+    print(f"\nOriginal: {len(test_text.split())} words")
+    print(f"Summary: {len(summary.split())} words")
+    print(f"\n{summary}")

@@ -10,93 +10,87 @@ Usage in DAG:
     summary = summarize_report(narrative_report)
 """
 
+import re
 from transformers import pipeline
 import warnings
 
 warnings.filterwarnings('ignore')
-
-# Global variable to cache the model (load once, use many times)
 _summarizer = None
 
-
 def get_summarizer():
-    """
-    Get or create the summarizer pipeline
-    
-    Loads model once and caches it for subsequent calls
-    """
     global _summarizer
-    
     if _summarizer is None:
         print("Loading DistilBART summarization model...")
         _summarizer = pipeline(
             "summarization",
             model="sshleifer/distilbart-cnn-12-6",
-            device=-1  # Use CPU (set to 0 for GPU if available)
+            device=-1
         )
         print("Model loaded")
-    
     return _summarizer
 
-
-def summarize_report(text: str, max_summary_words: int = 100) -> str:
-    """
-    Summarize a snow report using DistilBART
+def extract_snow_conditions(text: str) -> str:
+    """Extract sentences about snow conditions, filtering out events/sales"""
+    sentences = re.split(r'(?<=[.!?])\s+', text)
     
-    Args:
-        text: Full snow report text
-        max_summary_words: Target max length of summary (default 100 words)
+    snow_keywords = [
+        'snow', 'powder', 'base', 'depth', 'grooming', 'groomed',
+        'conditions', 'trails', 'lifts', 'open', 'closed',
+        'temperature', 'forecast', 'skiing', 'terrain', 'inches',
+        'cover', 'packed', 'icy', 'fresh', 'snowmaking', 'weather',
+        'corduroy'
+    ]
+    
+    exclude_keywords = [
+        'merchandise', 'shop', 'retail', 'sale', 'discount',
+        'event', 'party', 'concert', 'celebration', 'dining',
+        'restaurant', 'bar', 'apres', 'happy hour', 'menu', 'deal',
+        'tonight','santa','easter'
+    ]
+    
+    relevant_sentences = []
+    for sentence in sentences:
+        sentence_lower = sentence.lower()
         
-    Returns:
-        Summarized text, or original if too short/error
-    """
-    print(f"Starting summarization...")
-    print(f"Input length: {len(text.split())} words")
+        if any(keyword in sentence_lower for keyword in exclude_keywords):
+            continue
+        
+        if any(keyword in sentence_lower for keyword in snow_keywords):
+            relevant_sentences.append(sentence.strip())
+    
+    return ' '.join(relevant_sentences)
 
+def summarize_report(text: str, max_summary_words: int = 80) -> str:
+    """Summarize snow report focusing on conditions"""
     if not text or len(text.strip()) == 0:
-        print("Empty text, returning empty")
         return ""
     
-    words = text.split()
+    # Filter to snow conditions only
+    snow_only = extract_snow_conditions(text)
     
-    # Skip if too short to summarize
-    if len(words) < 30:
-        print(f"Too short ({len(words)} words), returning original")
-        return text
+    if len(snow_only.split()) < 30:
+        return snow_only  # Too short to summarize
     
-    # Truncate if too long (model limit ~1024 tokens)
-    max_input_words = 700
-    if len(words) > max_input_words:
-        print(f"Truncating from {len(words)} to {max_input_words} words")
-        text = ' '.join(words[:max_input_words])
+    # Truncate to 100 words
+    words = snow_only.split()
+    if len(words) > 100:
+        snow_only = ' '.join(words[:100])
     
     try:
-        print("Getting summarizer...")
         summarizer = get_summarizer()
         
-        # Calculate output length based on target
-        print("Running inference (this may take 30-60s)...")
-        max_len = min(250, max_summary_words * 1.2)  # Allow some buffer
-        min_len = min(60, max_len - 30)
-        
         result = summarizer(
-            text,
-            max_length=int(max_len),
-            min_length=int(min_len),
-            do_sample=False,
-            truncation=True,
-            max_new_tokens=int(max_len)
+            snow_only,
+            max_length=80,
+            min_length=30,
+            do_sample=False
         )
         
-        summary = result[0]['summary_text']
-        print(f"Generated summary: {len(summary.split())} words")
-        return summary
+        return result[0]['summary_text']
         
     except Exception as e:
         print(f"Summarization error: {e}")
-        print(f"Returning original text")
-        return text
-
+        return snow_only
 
 if __name__ == '__main__':
     test_text = """

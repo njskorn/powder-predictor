@@ -63,11 +63,12 @@ def summarize_mountain(s3_client, mountain: str):
     print(f"Original: {len(narrative_report.split())} words")
     
     # Generate summary
-    print("Generating AI summary...")
+    print("Generating DistilBART summary...")
     
     try:
         summary = summarize_report(narrative_report, max_summary_words=100)
         print(f"Summary: {len(summary.split())} words")
+        print(summary)
         
     except Exception as e:
         print(f"Summarization failed: {e}")

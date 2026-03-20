@@ -465,6 +465,36 @@ header h1 {
     font-style: italic;
 }
 
+.snow-summary-container {
+    margin-bottom: var(--space-lg);
+    padding: var(--space-lg);
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: var(--radius-md);
+}
+
+.snow-summary-container h4 {
+    margin: 0 0 var(--space-md) 0;
+    font-size: 1rem;
+    color: var(--accent-blue);
+}
+
+.snow-summary-text {
+    color: var(--text-primary);
+    line-height: 1.7;
+    font-size: 0.9375rem;
+}
+
+details summary {
+    cursor: pointer;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+}
+
+details[open] summary {
+    margin-bottom: var(--space-lg);
+}
+
 /* Weather Charts Section */
 .weather-charts-section {
     margin-top: var(--space-xl);

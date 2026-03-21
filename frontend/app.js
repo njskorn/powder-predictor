@@ -698,8 +698,10 @@ function renderWeatherChart(type, canvasId) {
     });
     
     if (data.length > 0) {
-        const firstDate = new Date(data[0].date);
-        const lastDate = new Date(data[data.length - 1].date);
+        const [year1, month1, day1] = data[0].date.split('-');
+        const firstDate = new Date(year1, month1 - 1, day1);
+        const [year2, month2, day2] = data[data.length - 1].date.split('-');
+        const lastDate = new Date(year2, month2 - 1, day2);
         
         let currentDate = new Date(firstDate);
         while (currentDate <= lastDate) {
@@ -709,6 +711,15 @@ function renderWeatherChart(type, canvasId) {
     }
     
     const dates = allDates;
+    const dateObjects = dates.map(d => {
+        const [year, month, day] = d.split('-');
+        return new Date(year, month - 1, day);
+    });
+
+    // Format labels
+    const labels = dateObjects.map(date => {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
     
     // Adaptive point size based on data length
     let pointRadius, pointHoverRadius;
@@ -864,7 +875,7 @@ function renderWeatherChart(type, canvasId) {
     
     new Chart(ctx, {
         type: 'line',
-        data: { labels: dates, datasets: datasets },
+        data: { labels: labels, datasets: datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -891,6 +902,15 @@ function renderWeatherChart(type, canvasId) {
                     padding: 12,
                     boxPadding: 6,
                     callbacks: {
+                        title: function(context) {
+                            const index = context[0].dataIndex;
+                            const date = dateObjects[index];
+                            return date.toLocaleDateString('en-US', { 
+                                weekday: 'short', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
+                        },
                         label: tooltipLabel
                     }
                 }

@@ -328,13 +328,18 @@ function renderChart(data) {
     
     // Find date range
     if (data.length > 0) {
-        const firstDate = new Date(data[0].date);
-        const lastDate = new Date(data[data.length - 1].date);
+        const [year1, month1, day1] = data[0].date.split('-');
+        const firstDate = new Date(year1, month1 - 1, day1);
+        const [year2, month2, day2] = data[data.length - 1].date.split('-');
+        const lastDate = new Date(year2, month2 - 1, day2);
         
         // Generate all dates in range
         let currentDate = new Date(firstDate);
         while (currentDate <= lastDate) {
-            allDates.push(currentDate.toISOString().split('T')[0]);
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const day = String(currentDate.getDate()).padStart(2, '0');
+            allDates.push(`${year}-${month}-${day}`);
             currentDate.setDate(currentDate.getDate() + 1);
         }
     }
@@ -346,21 +351,28 @@ function renderChart(data) {
     const blackData = dates.map(date => dataByDate[date]?.black ?? null);
     const gladesData = dates.map(date => dataByDate[date]?.glades ?? null);
     
+    // Create Date objects correctly (no timezone issues)
+    const dateObjects = dates.map(d => {
+        const [year, month, day] = d.split('-');
+        return new Date(year, month - 1, day);
+    });
+    
+    // Format labels
+    const labels = dateObjects.map(date => {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    
     // Adaptive point size based on data density
-    // 7 days = bigger points, 90 days = tiny points
     let pointRadius, pointHoverRadius;
     const dataLength = data.length;
     
     if (dataLength <= 10) {
-        // 7 days - large points
         pointRadius = 4;
         pointHoverRadius = 6;
     } else if (dataLength <= 40) {
-        // 30 days - small points
         pointRadius = 2;
         pointHoverRadius = 3.5;
     } else {
-        // 90 days (season) - tiny points
         pointRadius = 1.2;
         pointHoverRadius = 2.5;
     }
@@ -375,18 +387,27 @@ function renderChart(data) {
             
             ctx.save();
             
-            dates.forEach((dateStr, index) => {
-                const date = new Date(dateStr);
+            dateObjects.forEach((date, index) => {
                 const dayOfWeek = date.getDay();
                 
-                // 0 = Sunday, 6 = Saturday
-                if (dayOfWeek === 0 || dayOfWeek === 6) {
-                    const x = xAxis.getPixelForValue(index);
-                    const nextX = index < dates.length - 1 ? xAxis.getPixelForValue(index + 1) : xAxis.right;
-                    const width = nextX - x;
+                // Only trigger on Saturday (start of weekend visual)
+                if (dayOfWeek === 6) {  // Saturday
+                    // Calculate positions
+                    const satX = xAxis.getPixelForValue(index);
+                    const sunX = index < dates.length - 1 ? xAxis.getPixelForValue(index + 1) : xAxis.right;
                     
-                    ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';  // Subtle light shade for dark mode
-                    ctx.fillRect(x, yAxis.top, width, yAxis.bottom - yAxis.top);
+                    // Get Friday position (if it exists)
+                    const friX = index > 0 ? xAxis.getPixelForValue(index - 1) : xAxis.left;
+                    // Get Monday position (if Sunday exists)
+                    const monX = index < dates.length - 2 ? xAxis.getPixelForValue(index + 2) : xAxis.right;
+                    // Start: halfway between Friday and Saturday
+                    const startX = friX + (satX - friX) / 2;
+                    // End: halfway between Sunday and Monday
+                    const endX = sunX + (monX - sunX) / 2;
+                    const width = endX - startX;
+                    
+                    ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';
+                    ctx.fillRect(startX, yAxis.top, width, yAxis.bottom - yAxis.top);
                 }
             });
             
@@ -398,27 +419,24 @@ function renderChart(data) {
     currentChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: dates.map(d => {
-                const date = new Date(d);
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            }),
+            labels: labels,
             datasets: [
                 {
                     label: 'Beginner',
                     data: greenData,
-                    borderColor: '#10b981',  // Brighter green for dark mode
+                    borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderWidth: 3,  // Thicker lines
+                    borderWidth: 3,
                     tension: 0.3,
                     fill: false,
-                    spanGaps: false,  // Show gaps for missing data
+                    spanGaps: false,
                     pointRadius: pointRadius,
                     pointHoverRadius: pointHoverRadius
                 },
                 {
                     label: 'Intermediate',
                     data: blueData,
-                    borderColor: '#60a5fa',  // Lighter blue
+                    borderColor: '#60a5fa',
                     backgroundColor: 'rgba(96, 165, 250, 0.1)',
                     borderWidth: 3,
                     tension: 0.3,
@@ -430,7 +448,7 @@ function renderChart(data) {
                 {
                     label: 'Advanced',
                     data: blackData,
-                    borderColor: '#e2e8f0',  // Light gray/white - very visible on dark!
+                    borderColor: '#e2e8f0',
                     backgroundColor: 'rgba(226, 232, 240, 0.1)',
                     borderWidth: 3,
                     tension: 0.3,
@@ -442,7 +460,7 @@ function renderChart(data) {
                 {
                     label: 'Glades',
                     data: gladesData,
-                    borderColor: '#059669',  // Dark forest green (already good)
+                    borderColor: '#059669',
                     backgroundColor: 'rgba(5, 150, 105, 0.1)',
                     borderWidth: 3,
                     tension: 0.3,
@@ -467,7 +485,7 @@ function renderChart(data) {
                     labels: {
                         usePointStyle: true,
                         padding: 15,
-                        color: '#cbd5e1',  // Light gray for legend text
+                        color: '#cbd5e1',
                         font: {
                             size: 12,
                             weight: '600'
@@ -485,9 +503,12 @@ function renderChart(data) {
                     callbacks: {
                         title: function(context) {
                             const index = context[0].dataIndex;
-                            const date = new Date(dates[index]);
-                            const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
-                            return `${dayOfWeek}, ${context[0].label}`;
+                            const date = dateObjects[index];
+                            return date.toLocaleDateString('en-US', { 
+                                weekday: 'short', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
                         },
                         label: function(context) {
                             return `${context.dataset.label}: ${context.parsed.y} trails`;
@@ -501,7 +522,7 @@ function renderChart(data) {
                     title: {
                         display: true,
                         text: 'Trails Open',
-                        color: '#cbd5e1',  // Light gray text
+                        color: '#cbd5e1',
                         font: {
                             size: 13,
                             weight: '600'
@@ -509,10 +530,10 @@ function renderChart(data) {
                     },
                     ticks: {
                         stepSize: 5,
-                        color: '#94a3b8'  // Lighter gray for tick labels
+                        color: '#94a3b8'
                     },
                     grid: {
-                        color: 'rgba(148, 163, 184, 0.1)'  // Subtle grid lines
+                        color: 'rgba(148, 163, 184, 0.1)'
                     }
                 },
                 x: {
@@ -677,8 +698,10 @@ function renderWeatherChart(type, canvasId) {
     });
     
     if (data.length > 0) {
-        const firstDate = new Date(data[0].date);
-        const lastDate = new Date(data[data.length - 1].date);
+        const [year1, month1, day1] = data[0].date.split('-');
+        const firstDate = new Date(year1, month1 - 1, day1);
+        const [year2, month2, day2] = data[data.length - 1].date.split('-');
+        const lastDate = new Date(year2, month2 - 1, day2);
         
         let currentDate = new Date(firstDate);
         while (currentDate <= lastDate) {
@@ -688,6 +711,15 @@ function renderWeatherChart(type, canvasId) {
     }
     
     const dates = allDates;
+    const dateObjects = dates.map(d => {
+        const [year, month, day] = d.split('-');
+        return new Date(year, month - 1, day);
+    });
+
+    // Format labels
+    const labels = dateObjects.map(date => {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
     
     // Adaptive point size based on data length
     let pointRadius, pointHoverRadius;
@@ -843,7 +875,7 @@ function renderWeatherChart(type, canvasId) {
     
     new Chart(ctx, {
         type: 'line',
-        data: { labels: dates, datasets: datasets },
+        data: { labels: labels, datasets: datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -870,6 +902,15 @@ function renderWeatherChart(type, canvasId) {
                     padding: 12,
                     boxPadding: 6,
                     callbacks: {
+                        title: function(context) {
+                            const index = context[0].dataIndex;
+                            const date = dateObjects[index];
+                            return date.toLocaleDateString('en-US', { 
+                                weekday: 'short', 
+                                month: 'short', 
+                                day: 'numeric' 
+                            });
+                        },
                         label: tooltipLabel
                     }
                 }

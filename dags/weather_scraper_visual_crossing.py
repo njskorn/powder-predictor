@@ -266,8 +266,8 @@ def scrape_and_save_weather(**context):
     print("="*60)
     
     # Fail if all mountains failed
-    if not any(r.get('success') for r in results.values()):
-        raise Exception("All mountain weather scrapes failed")
+    if any('Error' in str(results[m]) for m in results):
+        raise Exception(f"Weather scraping failed for some mountains: {results}")
 
 
 def ping_healthcheck(**context):

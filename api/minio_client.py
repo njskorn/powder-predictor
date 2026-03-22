@@ -205,9 +205,10 @@ def get_historical_reports(mountain: str, days: int = 30) -> List[Dict]:
                     'blue': blue,
                     'black': black,
                     'glades': glades,
-                    'total': total
+                    'total': total,
+                    'is_closed': silver_data.get('is_closed', False)
                 })
-                logger.info(f"✓ Added data for {date_str}")
+                logger.info(f"Added data for {date_str}")
             else:
                 logger.debug(f"No files found for {date_str}")
                 

@@ -414,7 +414,47 @@ function renderChart(data) {
             ctx.restore();
         }
     };
-    
+
+    // Closure detection plugin
+    const closurePlugin = {
+        id: 'closureLines',
+        beforeDatasetsDraw(chart) {
+            const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+            
+            ctx.save();
+            
+            // Find dates marked as closed
+            dates.forEach((dateStr, index) => {
+                if (dataByDate[dateStr]?.is_closed === true) {
+                    const xPos = x.getPixelForValue(index);
+                    
+                    // Draw red dashed vertical line
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(xPos, top);
+                    ctx.lineTo(xPos, bottom);
+                    ctx.stroke();
+                    
+                    // Only show label if previous day was NOT closed (first day of closure)
+                    const prevDayClosed = index > 0 && dataByDate[dates[index - 1]]?.is_closed === true;
+                    
+                    if (!prevDayClosed) {
+                        // Add "CLOSED" label only on first day
+                        ctx.setLineDash([]);
+                        ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+                        ctx.font = 'bold 11px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('CLOSED', xPos, top + 12);
+                    }
+                }
+            });
+            
+            ctx.restore();
+        }
+    };
+        
     // Create chart
     currentChart = new Chart(ctx, {
         type: 'line',
@@ -557,7 +597,7 @@ function renderChart(data) {
                 }
             }
         },
-        plugins: [weekendShading]
+        plugins: [weekendShading, closurePlugin]
     });
 }
 

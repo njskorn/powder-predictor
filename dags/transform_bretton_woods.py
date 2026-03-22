@@ -195,6 +195,21 @@ def transform_bretton_woods(bronze_data: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         silver['glades'].append(silver_glade)
+
+    # ========================================================================
+    # SECTION 6: detect closures
+    # ========================================================================
+
+    # After building the Silver structure
+    narrative = silver['narrative_report']
+    trails_data = silver['trails']
+
+    # Detect closure using both signals
+    closure_keywords = ['closed', 'not operating', 'no skiing', 'will not be open']
+    closure_in_text = any(keyword in narrative.lower() for keyword in closure_keywords)
+    trails_open = sum(1 for t in trails_data if t.get('status') == 'open')
+
+    silver['is_closed'] = (closure_in_text and trails_open == 0)
     
     return silver
 

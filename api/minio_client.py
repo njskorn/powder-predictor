@@ -309,7 +309,6 @@ def get_powder_predictions(mountain: str, days: int = 7):
     """
     from datetime import datetime, timedelta
     
-    s3_client = create_minio_client()
     predictions = []
     
     # Get predictions for next N days
@@ -348,7 +347,6 @@ def get_historical_powder_days(mountain: str, days: int = 30):
     """
     from datetime import datetime, timedelta
     
-    s3_client = create_minio_client()
     powder_days = []
     
     end_date = datetime.now()

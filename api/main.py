@@ -183,3 +183,52 @@ app.mount("/static", StaticFiles(directory="frontend"), name="static")
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
+
+
+@app.get("/api/mountains/{mountain}/powder-predictions")
+async def get_powder_predictions_endpoint(mountain: str, days: int = 7):
+    """
+    Get powder day predictions for upcoming days
+    
+    Args:
+        mountain: Mountain name (bretton-woods, cannon, or cranmore)
+        days: Number of days ahead (default 7)
+    
+    Returns:
+        Powder predictions with confidence scores
+    """
+    from .minio_client import get_powder_predictions
+    
+    try:
+        predictions = get_powder_predictions(mountain, days)
+        
+        return {
+            "mountain": mountain,
+            "days": days,
+            "predictions": predictions
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving powder predictions for {mountain}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/mountains/{mountain}/historical-powder")
+async def get_historical_powder_endpoint(mountain: str, days: int = 30):
+    """
+    Get historical powder day analyses
+    
+    Returns dates where powder occurred or was predicted
+    """
+    from .minio_client import get_historical_powder_days
+    
+    try:
+        powder_days = get_historical_powder_days(mountain, days)
+        
+        return {
+            "mountain": mountain,
+            "days": days,
+            "powder_days": powder_days
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving historical powder for {mountain}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -294,3 +294,85 @@ def get_weather_history(mountain: str, days: int = 30) -> List[Dict]:
     
     logger.info(f"Retrieved {len(history)} days of weather data for {mountain}")
     return history
+
+
+def get_powder_predictions(mountain: str, days: int = 7):
+    """
+    Get powder day predictions from Gold layer
+    
+    Args:
+        mountain: Mountain ID
+        days: Number of days ahead to retrieve
+        
+    Returns:
+        List of powder predictions with dates and confidence
+    """
+    from datetime import datetime, timedelta
+    
+    s3_client = create_minio_client()
+    predictions = []
+    
+    # Get predictions for next N days
+    for i in range(days):
+        target_date = (datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d')
+        
+        try:
+            # Try predictions first (future)
+            response = s3_client.get_object(
+                Bucket='gold-snow-reports',
+                Key=f'powder_analysis/predictions/{mountain}/{target_date}.json'
+            )
+            analysis = json.loads(response['Body'].read())
+            predictions.append(analysis)
+            
+        except:
+            # Try historical (for showing past performance)
+            try:
+                response = s3_client.get_object(
+                    Bucket='gold-snow-reports',
+                    Key=f'powder_analysis/historical/{mountain}/{target_date}.json'
+                )
+                analysis = json.loads(response['Body'].read())
+                predictions.append(analysis)
+            except:
+                pass
+    
+    return predictions
+
+
+def get_historical_powder_days(mountain: str, days: int = 30):
+    """
+    Get historical powder day analyses
+    
+    Returns list of dates where powder was detected (TP or FN)
+    """
+    from datetime import datetime, timedelta
+    
+    s3_client = create_minio_client()
+    powder_days = []
+    
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    current = start_date
+    while current <= end_date:
+        date_str = current.strftime('%Y-%m-%d')
+        
+        try:
+            response = s3_client.get_object(
+                Bucket='gold-snow-reports',
+                Key=f'powder_analysis/historical/{mountain}/{date_str}.json'
+            )
+            analysis = json.loads(response['Body'].read())
+            
+            # Include if actual powder day OR if we predicted powder
+            if analysis.get('actual', {}).get('was_powder_day') or \
+               analysis.get('prediction', {}).get('is_powder_day'):
+                powder_days.append(analysis)
+                
+        except:
+            pass
+        
+        current += timedelta(days=1)
+    
+    return powder_days

@@ -6,7 +6,7 @@ Aggregates snow reports and weather from three NH mountains into a unified dashb
 
 ---
 
-## I was tired of visitng multiple websites for snow reports and weather data. Plus, ski resorts typically only show *today's* conditions. Powder Predictor:
+#### I was tired of visitng multiple websites for snow reports and weather data. Plus, ski resorts typically only show *today's* conditions. Powder Predictor:
 
 - **Aggregates data** - One dashboard, all mountains
 - **Shows history** - Resorts hide their seasonal decline; this shows it
@@ -17,6 +17,38 @@ Aggregates snow reports and weather from three NH mountains into a unified dashb
 - Cranmore Mountain Resort
 - Bretton Woods Mountain Resort  
 - Cannon Mountain
+
+---
+
+## Architecture
+
+
+### Data Pipeline
+- **Bronze**
+    - Raw HTML/JSON from scrapers |
+- **Silver**
+    - Parsed terrain counts, weather, AI summaries, closure detection
+- **Gold**
+    - Analytics-ready Parquet + metrics
+
+### Stack
+
+| Layer | Technology |
+|-------|-----------:|
+| **Language** | Python 3.11
+| **Orchestration** | Apache Airflow
+| **Storage** | MinIO (S3-compatible)
+| **Data Warehouse** | DuckDB
+| **Format** | Delta Lake (Parquet)
+| **Container** | Docker + Docker Compose
+| **NLP** | HuggingFace DistilBART, launchd |
+| **API** | FastAPI, boto3 |
+| **Frontend** | Vanilla JS, Chart.js |
+| **Monitoring** | Healthchecks.io |
+
+
+![Dashboard showing 30-day trend of trail counts and snowfall at Cranmore Mountain](cranmore_ex.png)
+*Dark-theme dashboard displaying historical trail counts by difficulty (Beginner/Intermediate/Advanced/Glades) and weather metrics (new snow, snow depth) with interactive time range selector.*
 
 ---
 
@@ -68,34 +100,6 @@ Separated concerns = easy to version, debug, and improve transformations indepen
     - Data Pipeline Work: I love driving
     - API: I can do this, I can do this
     - CSS: Help
-
----
-
-## Architecture
-
-
-### Data Pipeline
-- **Bronze**
-    - Raw HTML/JSON from scrapers |
-- **Silver**
-    - Parsed terrain counts, weather, AI summaries, closure detection
-- **Gold**
-    - Analytics-ready Parquet + metrics
-
-### Stack
-
-| Layer | Technology |
-|-------|-----------:|
-| **Language** | Python 3.11
-| **Orchestration** | Apache Airflow
-| **Storage** | MinIO (S3-compatible)
-| **Data Warehouse** | DuckDB
-| **Format** | Delta Lake (Parquet)
-| **Container** | Docker + Docker Compose
-| **NLP** | HuggingFace DistilBART, launchd |
-| **API** | FastAPI, boto3 |
-| **Frontend** | Vanilla JS, Chart.js |
-| **Monitoring** | Healthchecks.io |
 
 ---
 

@@ -24,12 +24,9 @@ Aggregates snow reports and weather from three NH mountains into a unified dashb
 
 
 ### Data Pipeline
-- **Bronze**
-    - Raw HTML/JSON from scrapers |
-- **Silver**
-    - Parsed terrain counts, weather, AI summaries, closure detection
-- **Gold**
-    - Analytics-ready Parquet + metrics
+- **Bronze**: Raw HTML/JSON from scrapers
+- **Silver**: Parsed terrain counts, weather, AI summaries, closure detection
+- **Gold**: Analytics-ready Parquet + metrics
 
 ### Stack
 
@@ -47,8 +44,8 @@ Aggregates snow reports and weather from three NH mountains into a unified dashb
 | **Monitoring** | Healthchecks.io |
 
 
-![Dashboard showing 30-day trend of trail counts and snowfall at Cranmore Mountain](cranmore_ex.png)
-*Dark-theme dashboard displaying historical trail counts by difficulty (Beginner/Intermediate/Advanced/Glades) and weather metrics (new snow, snow depth) with interactive time range selector.*
+<img src="cranmore_ex.png" width="70%" alt="Dashboard showing 30-day trends at Cranmore">
+*Dark-theme interactive frontend displaying historical trail counts by difficulty (Beginner/Intermediate/Advanced/Glades), weather metrics (new snow, snow depth) and graceful failure during outages.*
 
 ---
 

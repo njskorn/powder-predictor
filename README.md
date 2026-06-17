@@ -43,9 +43,8 @@ Aggregates snow reports and weather from three NH mountains into a unified dashb
 | **Frontend** | Vanilla JS, Chart.js |
 | **Monitoring** | Healthchecks.io |
 
-
+#### *Dark-theme interactive frontend displaying historical trail counts by difficulty (Beginner/Intermediate/Advanced/Glades), weather metrics (new snow, snow depth) and graceful failure during outages.*
 <img src="cranmore_ex.png" width="70%" alt="Dashboard showing 30-day trends at Cranmore">
-*Dark-theme interactive frontend displaying historical trail counts by difficulty (Beginner/Intermediate/Advanced/Glades), weather metrics (new snow, snow depth) and graceful failure during outages.*
 
 ---
 
